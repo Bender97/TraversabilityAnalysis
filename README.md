@@ -1,4 +1,4 @@
-# PYRAMID
+# Pyramidal 3D Feature Fusion on Polar-Grids for Fast and Robust Traversability Analysis on CPU
 
 # Requirements
 
