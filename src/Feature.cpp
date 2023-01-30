@@ -1,7 +1,5 @@
 #include "Feature.h"
 
-#define TOT_GEOM_FEATURES 17
-
 void Feature::computeCorrelationMatrix(std::vector<int> &points_idx, std::vector<Eigen::Vector3d> &points) {
     
     cx=0; cy=0; cz=0;  
@@ -53,8 +51,6 @@ std::string Feature::toString() {
   ss << std::to_string(unevenness) << " ";
   ss << std::to_string(surface_density) << " ";
   ss << std::to_string(z_diff) << " ";
-  ss << std::to_string(internal_density) << " ";
-  ss << std::to_string(volume);
 
   ss << " derived: ";
   for (int i=0; i<(int)derived_features.size(); i++)
@@ -82,8 +78,7 @@ std::vector<float> Feature::toVector() {
   feature[14] = unevenness;
   feature[15] = surface_density;
   feature[16] = z_diff;
-  //feature[17] = internal_density;
-  //feature[18] = volume;
+
   for (int i=0; i<(int)derived_features.size(); i++)
     feature[TOT_GEOM_FEATURES+i] = derived_features[i];
   return feature;
@@ -114,8 +109,6 @@ void Feature::toFile(std::ofstream &out) {
   out.write( reinterpret_cast<const char*>( &(unevenness) ), sizeof( float ));
   out.write( reinterpret_cast<const char*>( &(surface_density) ), sizeof( float ));
   out.write( reinterpret_cast<const char*>( &(z_diff) ), sizeof( float ));
-  //out.write( reinterpret_cast<const char*>( &(internal_density) ), sizeof( float ));
-  //out.write( reinterpret_cast<const char*>( &(volume) ), sizeof( float ));
   
   for (int i=0; i<(int)derived_features.size(); i++)
     out.write( reinterpret_cast<const char*>( &(derived_features[i]) ), sizeof( float ));
@@ -140,8 +133,7 @@ int Feature::fromFileLine(std::ifstream &in, int derived_features_num) {
     in.read( reinterpret_cast< char*>( &(unevenness) ), sizeof( float ));
     in.read( reinterpret_cast< char*>( &(surface_density) ), sizeof( float ));
     in.read( reinterpret_cast< char*>( &(z_diff) ), sizeof( float ));
-    //in.read( reinterpret_cast< char*>( &(internal_density) ), sizeof( float ));
-    //in.read( reinterpret_cast< char*>( &(volume) ), sizeof( float ));
+
     if (derived_features_num<=0) return 1;
     derived_features.resize(derived_features_num); 
     for (int i=0; i<derived_features_num; i++)

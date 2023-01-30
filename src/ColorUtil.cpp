@@ -1,8 +1,17 @@
 #include "ColorUtil.h"
 
+Eigen::Vector3d darkgray(0.92f, 0.92f, 0.92f);
+Eigen::Vector3d  darkred(0.545f, 0.0f, 0.0f);
+Eigen::Vector3d limegreen(0.19f, 0.8f, 0.19f);
 
-ColorUtil::ColorUtil() {
-colors = std::vector<Color>(260);
+ColorUtil::ColorUtil() {}
+ColorUtil_SemKITTI::ColorUtil_SemKITTI() : ColorUtil() {load_colors();}
+ColorUtil_NuSC::ColorUtil_NuSC() : ColorUtil() {load_colors();}
+
+void ColorUtil::load_colors() {}
+
+void ColorUtil_SemKITTI::load_colors() {
+  colors = std::vector<Color>(260);
   colors[0].r =  0;  colors[0].g = 0; colors[0].b = 0;        // "unlabeled"
   colors[1].r =  0;  colors[1].g = 0; colors[1].b = 255;      // "outlier"
   colors[10].r = 245; colors[10].g = 150; colors[10].b = 100;  // "car"
@@ -39,86 +48,50 @@ colors = std::vector<Color>(260);
   colors[259].r = 255; colors[259].g = 0; colors[259].b = 0;     // "moving-other-vehicle"
 }
 
-// ColorUtil::ColorUtil() {
-//   colors = std::vector<Color>(32);
-//   colors[0].r = 0;    colors[0].g = 0;    colors[0].b = 0;
-//   colors[1].r = 70;   colors[1].g = 130;  colors[1].b = 180;
-//   colors[2].r = 0;    colors[2].g = 0;    colors[2].b = 230;
-//   colors[3].r = 135;  colors[3].g = 206;  colors[3].b = 235;
-//   colors[4].r = 100;  colors[4].g = 149;  colors[4].b = 237;
-//   colors[5].r = 219;  colors[5].g = 112;  colors[5].b = 147;
-//   colors[6].r = 0;    colors[6].g = 0;    colors[6].b = 128;
-//   colors[7].r = 240;  colors[7].g = 128;  colors[7].b = 128;
-//   colors[8].r = 138;  colors[8].g = 43;   colors[8].b = 226;
-//   colors[9].r = 112;  colors[9].g = 128;  colors[9].b = 144;
-//   colors[10].r = 210; colors[10].g = 105;  colors[10].b = 30;
-//   colors[11].r = 105; colors[11].g = 105;  colors[11].b = 105;
-//   colors[12].r = 47;  colors[12].g = 79;   colors[12].b = 79;
-//   colors[13].r = 188; colors[13].g = 143;  colors[13].b = 143;
-//   colors[14].r = 220; colors[14].g = 20;   colors[14].b = 60;
-//   colors[15].r = 255; colors[15].g = 127;  colors[15].b = 80;
-//   colors[16].r = 255; colors[16].g = 69;   colors[16].b = 0;
-//   colors[17].r = 255; colors[17].g = 158;  colors[17].b = 0;
-//   colors[18].r = 233; colors[18].g = 150;  colors[18].b = 70;
-//   colors[19].r = 255; colors[19].g = 83;   colors[19].b = 0;
-//   colors[20].r = 255; colors[20].g = 215;  colors[20].b = 0;
-//   colors[21].r = 255; colors[21].g = 61;   colors[21].b = 99;
-//   colors[22].r = 255; colors[22].g = 140;  colors[22].b = 0;
-//   colors[23].r = 255; colors[23].g = 99;   colors[23].b = 71;
-//   colors[24].r = 0;   colors[24].g = 207;  colors[24].b = 191;
-//   colors[25].r = 175; colors[25].g = 0;    colors[25].b = 75;
-//   colors[26].r = 75;  colors[26].g = 0;    colors[26].b = 75;
-//   colors[27].r = 112; colors[27].g = 180;  colors[27].b = 60;
-//   colors[28].r = 222; colors[28].g = 184;  colors[28].b = 135;
-//   colors[29].r = 255; colors[29].g = 228;  colors[29].b = 196;
-//   colors[30].r = 0;   colors[30].g = 175;  colors[30].b = 0;
-//   colors[31].r = 255; colors[31].g = 240;  colors[31].b = 245;
-// }
-
-//  void ColorUtil::setColor(pcl::PointXYZRGB &point, int &label) {
-//    Color color = colors[label];
-//    point.r = color.b;
-//    point.g = color.g;
-//    point.b = color.r;
-//  }
-
-void ColorUtil::setColor(Eigen::Vector3d &point, int &label) {
-  Color color = colors[label];
-  point(0) = color.b/255.0f;
-  point(1) = color.g/255.0f;
-  point(2) = color.r/255.0f;
+void ColorUtil_NuSC::load_colors() {
+  colors = std::vector<Color>(32);
+  colors[0].r = 0;    colors[0].g = 0;    colors[0].b = 0;
+  colors[1].r = 70;   colors[1].g = 130;  colors[1].b = 180;
+  colors[2].r = 0;    colors[2].g = 0;    colors[2].b = 230;
+  colors[3].r = 135;  colors[3].g = 206;  colors[3].b = 235;
+  colors[4].r = 100;  colors[4].g = 149;  colors[4].b = 237;
+  colors[5].r = 219;  colors[5].g = 112;  colors[5].b = 147;
+  colors[6].r = 0;    colors[6].g = 0;    colors[6].b = 128;
+  colors[7].r = 240;  colors[7].g = 128;  colors[7].b = 128;
+  colors[8].r = 138;  colors[8].g = 43;   colors[8].b = 226;
+  colors[9].r = 112;  colors[9].g = 128;  colors[9].b = 144;
+  colors[10].r = 210; colors[10].g = 105;  colors[10].b = 30;
+  colors[11].r = 105; colors[11].g = 105;  colors[11].b = 105;
+  colors[12].r = 47;  colors[12].g = 79;   colors[12].b = 79;
+  colors[13].r = 188; colors[13].g = 143;  colors[13].b = 143;
+  colors[14].r = 220; colors[14].g = 20;   colors[14].b = 60;
+  colors[15].r = 255; colors[15].g = 127;  colors[15].b = 80;
+  colors[16].r = 255; colors[16].g = 69;   colors[16].b = 0;
+  colors[17].r = 255; colors[17].g = 158;  colors[17].b = 0;
+  colors[18].r = 233; colors[18].g = 150;  colors[18].b = 70;
+  colors[19].r = 255; colors[19].g = 83;   colors[19].b = 0;
+  colors[20].r = 255; colors[20].g = 215;  colors[20].b = 0;
+  colors[21].r = 255; colors[21].g = 61;   colors[21].b = 99;
+  colors[22].r = 255; colors[22].g = 140;  colors[22].b = 0;
+  colors[23].r = 255; colors[23].g = 99;   colors[23].b = 71;
+  colors[24].r = 0;   colors[24].g = 207;  colors[24].b = 191;
+  colors[25].r = 175; colors[25].g = 0;    colors[25].b = 75;
+  colors[26].r = 75;  colors[26].g = 0;    colors[26].b = 75;
+  colors[27].r = 112; colors[27].g = 180;  colors[27].b = 60;
+  colors[28].r = 222; colors[28].g = 184;  colors[28].b = 135;
+  colors[29].r = 255; colors[29].g = 228;  colors[29].b = 196;
+  colors[30].r = 0;   colors[30].g = 175;  colors[30].b = 0;
+  colors[31].r = 255; colors[31].g = 240;  colors[31].b = 245;
 }
 
-//  void ColorUtil::setColorBasedOnCoordinates(pcl::PointXYZRGB &point) {
-//
-//  	int b, g, r;
-//  	int row = (int) std::floor((point.x + GBR_x) / RES);
-//    int col = (int) std::floor((point.y + GBR_y) / RES);
-//
-//    if (col>=TOT_cells) col=TOT_cells;
-//    else if (col < 0) col = 0;
-//    if (row>=TOT_cells) row=TOT_cells;
-//    else if (row < 0) row = 0;
-//
-//    /*
-//    if (col%2==0) b = 100;
-//    else b = 255;
-//    if (row%2==0) g = 50;
-//    else g = 255;
-//    */
-//
-//    //b = (int) ((col) * 255 / (TOT_cells));
-//    //g = (int) ((row) * 255 / (TOT_cells));
-//
-//    g = ((row * 20) % 230) + 20 ;
-//    r = ((col * 20) % 230) + 20 ;
-//
-//
-//    b = 255;
-//
-//    point.r = b;
-//    point.g = g;
-//    point.b = r;
-//
-//  }
-//#endif
+void ColorUtil::setColor(Eigen::Vector3d &color_, int &label) {
+  Color color = colors[label];
+  color_(0) = color.b/255.0f;
+  color_(1) = color.g/255.0f;
+  color_(2) = color.r/255.0f;
+}
+void ColorUtil::setColor_DL(Eigen::Vector3d &color_, int &label) {
+       if(label==1 || label==2) color_ = limegreen;
+  else if(label==-1) color_ = darkred;
+  else color_ = darkgray;
+}

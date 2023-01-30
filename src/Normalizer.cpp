@@ -9,11 +9,11 @@ void Normalizer::init(int tot_geom_features_) {
     var.resize(tot_geom_features);
 }
 
+Normalizer::Normalizer() {}
+
 Normalizer::Normalizer(int tot_geom_features_) {
     init(tot_geom_features_);
 }
-
-Normalizer::Normalizer() {}
 
 Normalizer::Normalizer(int tot_geom_features_, std::string fileName) {
     init(tot_geom_features_);
@@ -23,66 +23,57 @@ Normalizer::Normalizer(int tot_geom_features_, std::string fileName) {
 bool Normalizer::empty() {return min.empty();}
 
 void Normalizer::computeStatistics(cv::Mat &X_train) {
-    /// find min and max for each column
 
-    int maxint = 100000;
+    std::vector<float> sqavg(tot_geom_features, .0f); // avg & var
+    int maxint = 100000, i, row;
     float *row_ptr;
+    float temp;
     
-    for (size_t i=0; i<tot_geom_features; i++) {
+    // initialize values to zero, or for min/max
+    for (i=0; i<tot_geom_features; i++) {
         max[i] = FLT_MIN;
         min[i] = FLT_MAX;
-        p2p[i] = .0f;
-        avg[i] = .0f;
-        var[i] = .0f;
+        p2p[i] = avg[i] = var[i] = .0f;
     }
 
-    for ( size_t row=0; row<X_train.rows; row++) {
+    // find min and max of each features, and avg/sqavg pre-proc values
+    for ( row=0; row<X_train.rows; row++) {
         row_ptr = X_train.ptr<float>(row);
-        for (size_t i=0; i<tot_geom_features; i++) {
+        for ( i=0; i<tot_geom_features; i++) {
             if (row_ptr[i]>max[i]) max[i] = row_ptr[i];
             if (row_ptr[i]<min[i]) min[i] = row_ptr[i];
-        }
-    }
 
-    /// compute the peek to peek distance for each column
-    for (size_t i=0; i<tot_geom_features; i++) p2p[i] = max[i] - min[i];
-
-    // sanitize
-    for (size_t i=0; i<tot_geom_features; i++) {
-        min[i] = ( std::floor(min[i]*maxint)) / (float)maxint;
-        max[i] = (  std::ceil(max[i]*maxint)) / (float)maxint;
-        p2p[i] = (  std::ceil(p2p[i]*maxint) + 1) / (float)maxint;
-    }
-
-    //avg & var
-    std::vector<float> sqavg(avg.size(), .0f);
-    float temp;
-
-    for ( size_t row=0; row<X_train.rows; row++) {
-        row_ptr = X_train.ptr<float>(row);
-        for (size_t i=0; i<tot_geom_features; i++) {
                 temp  = row_ptr[i];
               avg[i] += temp;
             sqavg[i] += (temp * temp);
         }
     }
-    for (size_t i=0; i<tot_geom_features; i++) {
-        avg[i] /= X_train.rows;
-        sqavg[i] /= X_train.rows;
-    }
 
-    for (size_t i=0; i<tot_geom_features; i++) {
-        if (sqavg[i] - (avg[i] * avg[i]) <= 0) var[i]=1e-8; //throw std::runtime_error(std::string("error sqavg at i ") + std::to_string(i));
+    for ( i=0; i<tot_geom_features; i++) {
+        // compute the peek to peek distance for each column
+        p2p[i] = max[i] - min[i];
+
+        // sanitize
+        min[i] = ( std::floor(min[i]*maxint))     / (float)maxint;
+        max[i] = (  std::ceil(max[i]*maxint))     / (float)maxint;
+        p2p[i] = (  std::ceil(p2p[i]*maxint) + 1) / (float)maxint;
+        
+        // actually average values
+        avg[i]   /= X_train.rows;
+        sqavg[i] /= X_train.rows;
+
+        // compute variance
+        if (sqavg[i] - (avg[i] * avg[i]) <= 0) var[i]=1e-8;
         else var[i] = std::sqrt(sqavg[i] - (avg[i] * avg[i]));
     }
+
 }
 
 void Normalizer::normalize(cv::Mat &X_train) {
     float *row_ptr;
-    int cols_to_norm = tot_geom_features;
-    for (size_t row = 0; row < X_train.rows; row++) {
+    for (int row = 0; row < X_train.rows; row++) {
         row_ptr = X_train.ptr<float>(row);
-        for (int i=0; i < cols_to_norm; i++)
+        for (int i=0; i < tot_geom_features; i++)
             row_ptr[i] = (row_ptr[i] - avg[i]) / var[i];
     }
 }
@@ -91,35 +82,11 @@ void Normalizer::normalize(cv::Mat &X_train, int valid_rows) {
     float *row_ptr;
     int i;
     
-    for (size_t row = 0; row < valid_rows; row++) {
+    for (int row = 0; row < valid_rows; row++) {
         row_ptr = X_train.ptr<float>(row);
         for (i=0; i < tot_geom_features; i++)
             row_ptr[i] = (row_ptr[i] - avg[i]) / var[i];
     }
-}
-
-/*void Normalizer::normalize_v(std::vector<float> &features_v) {
-    for (int i=0; i < 19; i++)
-        features_v[i] = (features_v[i] - min[i]) / p2p[i];
-    for (int i=19; i < features_num; i++)
-        features_v[i] = (features_v[i] + 1.0f ) / 2.0f;
-
-    for (int i=0; i < features_num; i++)
-             if (features_v[i]> 1.0f) features_v[i]= 1.0f;
-        else if (features_v[i]<-1.0f) features_v[i]=-1.0f;
-}*/
-
-void Normalizer::normalize_v(cv::Mat &row) {
-    //for (int i=0; i < tot_geom_features; i++)
-    //    features_v[i] = (features_v[i] - avg[i]) / var[i];
-    
-    
-    // //for (int i=19; i < features_num; i++)
-    // //    features_v[i] = (features_v[i] + 1.0f ) / 2.0f;
-
-    // //for (int i=0; i < features_num; i++)
-    // //         if (features_v[i]> 1.0f) features_v[i]= 1.0f;
-    // //    else if (features_v[i]<-1.0f) features_v[i]=-1.0f;
 }
 
 void Normalizer::normalize_train_and_store(cv::Mat &X_train, std::string fileName) {

@@ -4,25 +4,39 @@
 #define COLOR_UTIL
 
 #include <vector>
-#include <cmath>
 #include <Eigen/Dense>
 
 struct Color {
   int r, g, b;
 };
 
+
 class ColorUtil {
-public:
+ protected:
   std::vector<Color> colors;
+  virtual void load_colors();
 
+public:
   ColorUtil();
+  void setColor(Eigen::Vector3d &color, int &label);
+  void setColor_DL(Eigen::Vector3d &color, int &label);
 
-//  void setColor(pcl::PointXYZRGB &point, int &label);
+};
 
-  void setColor(Eigen::Vector3d &point, int &label);
+class ColorUtil_SemKITTI : public ColorUtil {
+protected:
+  void load_colors();
 
-//  void setColorBasedOnCoordinates(pcl::PointXYZRGB &point);
+public:
+  ColorUtil_SemKITTI();
+};
 
+class ColorUtil_NuSC : public ColorUtil {
+protected:
+  void load_colors();
+
+public:
+  ColorUtil_NuSC();
 };
 
 #endif // COLOR_UTIL

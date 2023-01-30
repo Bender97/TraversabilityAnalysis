@@ -45,8 +45,8 @@ void Metric::print(const char *msg, int tot_cells, int tot_workers) const {
 }
 
 void Metric::printLight(const char *msg, int tot_cells, int tot_workers) const {
-  std::cout << std::setw(12) << "\033[1;31m" << msg << "\033[0m";
-  std::cout << "        acc: \033[1;32m" << std::setw(8) << std::setprecision(4) << acc() << "\033[0m";
+  std::cout << "\033[1;31m" << std::setw(12) << msg << "\033[0m";
+  std::cout << "  acc: \033[1;32m" << std::setw(8) << std::setprecision(4) << acc() << "\033[0m";
   std::cout << " lat: \033[1;35m" << std::setw(5) << (checkpointTime_ ) << "\033[0m ms";
   std::cout << std::endl;// << std::endl;
 }
@@ -99,5 +99,5 @@ void Metric::toYaml(float nu, float gamma, float C, int pca, int rows, int tot_c
 
 void Metric::resetTime() { checkpointTime_=0; bt.reset(); }
 void Metric::resetAcc() { tp=0;tn=0;fp=0;fn=0;tot=0; }
-void Metric::resetAll() { tp=0;tn=0;fp=0;fn=0;tot=0; resetTime(); }
+void Metric::resetAll() { resetAcc(); resetTime(); }
 void Metric::checkpointTime() { checkpointTime_ = bt.elapsedTimeMs(); }

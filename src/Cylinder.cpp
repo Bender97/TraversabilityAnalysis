@@ -1,69 +1,33 @@
 #include "Cylinder.h"
 
 
-static Eigen::Vector3d      red(1.0f, 0.0f, 0.0f);
-static Eigen::Vector3d  darkred(0.545f, 0.0f, 0.0f);
-static Eigen::Vector3d lightred(1.0f, 0.7f, 0.7f);
-static Eigen::Vector3d    white(1.0f, 1.0f, 1.0f);
-static Eigen::Vector3d darkgray(0.92f, 0.92f, 0.92f);
 
-static Eigen::Vector3d road(0.7f, 0.7f, 0.5f);
-
-
-static Eigen::Vector3d limegreen(0.19f, 0.8f, 0.19f);
-static Eigen::Vector3d yellow(0.94f, 0.91f, 0.64f);
-static Eigen::Vector3d darkorange(1.0f, 0.54f, 0.0f);
-static Eigen::Vector3d blue(0.0f, 0.0f, 1.0f);
-
-static Eigen::Vector3d tp_color = limegreen; //road;
-static Eigen::Vector3d tn_color = limegreen; //red;
-static Eigen::Vector3d fp_color = darkred;
-static Eigen::Vector3d fn_color = blue;
-
-static Eigen::Vector3d      zerov(0.0f, 0.0f, 0.0f);
-
-inline int int_floor(double x)
-{
-  int i = (int)x; /* truncate */
-  return i - ( i > x ); /* convert trunc to floor */
-}
-
-Cylinder::Cylinder(YAML::Node &node, int tot_geom_features_) {
+Cylinder::Cylinder(YAML::Node &node) {
   start_radius = node["min_radius"].as<float>();
   end_radius   = node["max_radius"].as<float>();
   steps_num    = node["steps_num"].as<int>();
   yaw_steps    = node["yaw_steps"].as<int>();
   z            = node["z_level"].as<float>();
 
-  yaw_steps_half    = yaw_steps / 2;
-  tot_geom_features = tot_geom_features_;
+  yaw_steps_half = yaw_steps / 2;
 
   radius_step = ((end_radius - start_radius) * 100000 + 5) / steps_num / 100000.0f; // just a truncation
-  yaw_res = M_DOUBLE_PI / yaw_steps;
+  yaw_res     = M_DOUBLE_PI / yaw_steps;
 
   tot_cells = steps_num*yaw_steps;
-
-  y_train = cv::Mat(tot_cells, 1, CV_32FC1);
 
   grid       = std::vector<Cell>(tot_cells);
   features   = std::vector<Feature>(tot_cells);
   area       = std::vector<float>(tot_cells);
   remap_idxs = std::vector<int>(tot_cells, -1);
 
+  GT_labels_vector = cv::Mat(tot_cells, 1, CV_32FC1);
   predictions_vector = cv::Mat(tot_cells, 1, CV_32F);
 
   if (!node["dataset"])
     throw std::runtime_error(
-          std::string("\033[1;31mERROR\033[0m. please set dataset mode.\n"));
+          std::string("\033[1;31mERROR\033[0m. please set dataset mode.\n") );
   
-  // if (node["dataset"].as<std::string>() == "SemKITTI")
-    //  std::bind(&Cylinder::computeTravGT, computeTravGT_SemKITTI, std::placeholders::_1);
-  // computeTravGT = std::bind(&Cylinder::computeTravGT_SemKITTI, this, std::placeholders::_1);
-
-  // else 
-    // computeTravGT = std::function<void(std::vector<int> &)>(&Cylinder::computeTravGT_NuSc, this);
-    // computeTravGT = std::bind(&Cylinder::computeTravGT_NuSc, this, std::placeholders::_1);
-
   tmetric.resetAll();
   gmetric.resetAll();
 
@@ -75,291 +39,139 @@ Cylinder::Cylinder(YAML::Node &node, int tot_geom_features_) {
     }
   }
   
-  // initialize mesh: it's the polar-grid graphics geometry
-  createTriang();
-  
 }
 
-Cylinder::Cylinder(YAML::Node &node,  Cylinder *cyl_, int tot_geom_features_, int produce_features)
-: Cylinder(node, tot_geom_features_)
+Cylinder::Cylinder(YAML::Node &node,  Cylinder *cyl_, ExpMode expmode) : Cylinder(node)
 {
 
-  level = 0;
-  //if (cyl_!=nullptr) level = cyl_->features[0].derived_features.size()+1;
+  level = 0; mode = -1; trick_mode=0; pca_mode=-1;
   if (cyl_!=nullptr) level = cyl_->level + 1;
 
-  modes = std::vector<std::string>({"geom", "geom_label", "geom_all", "geom_pca", "geom_pca_label", "geom_pca_all_label"});
+  if (node["mode"]) mode = node["mode"].as<int>();
 
-  std::cout << "train level: " << level << "  " << std::flush;
-
-  mode = -1;
-  if (node["mode"]) {
-    mode = node["mode"].as<int>();
-    std::cout << "training in " << modes[mode] << " mode  " << std::flush;
-  }
-  if (produce_features<0) {
-    std::cout << "Test mode!" << std::endl;
+  if (expmode == ExpMode::DL) {
+    std::cout << "Deep Learning test mode! No need for other configurations" << std::endl;
     return;
   }
-
-  trick_mode=0;
-  if (node["trick"])      trick_mode = node["trick"].as<int>();
-  std::cout << "trick_mode " << (trick_mode ? " on  " : "off  ") << std::endl;
   
-  pca_mode = -1;
-  if (node["pca"])       pca_mode = node["pca"].as<int>();
-  else std::cout << "NO PCA MODE FOUND!" << std::endl;
-  std::cout << "pca_mode " << pca_mode << std::endl;
-  if (mode>=3) {
-
-    std::string cname = "results/lv" + std::to_string(level) + "/"
-              + modes[mode] + (trick_mode ? "_trick" : "") + "/pca_config_data" + std::to_string(pca_mode) + ".yaml";
-    std::cout << "loading PCA from " << cname << std::endl;
-    cv::FileStorage fs(cname, cv::FileStorage::READ);
-    fs["mean"] >> pca.mean ;
-    fs["vectors"] >> pca.eigenvectors ;
-    fs["values"] >> pca.eigenvalues ;
-    fs.release();
-
-    std::cout << "eigenvalues: " << pca.eigenvalues.size() << std::endl;
-  }
-
+  if (node["trick"]) trick_mode = node["trick"].as<int>();
+  
+  if (node["load_path"]) load_path = sanitize(node["load_path"].as<std::string>());
+  if (node["save_path"]) save_path = sanitize(node["save_path"].as<std::string>());
+  
+  loadPCAConfigs(node);
   computeFeaturesCols();
+  if (expmode == ExpMode::test) loadSVM(node);
 
-  X_train = cv::Mat(tot_cells, training_cols, CV_32F);
-  if (mode<3)
-    tmp = cv::Mat(tot_cells, training_cols, CV_32F);
-  else
-    tmp = cv::Mat(tot_cells, pca_mode+level, CV_32F);
-
-  //std::cout << " adding " << level << " derived features. Check: " << std::flush;
-
-  int dfs = (1+tot_geom_features)*level;  // derived features size
-  for (auto &f : features) f.derived_features.resize(dfs);
-  std::cout << " adding " << dfs << " derived features. Check: " << features[0].derived_features.size() << " but real used: " << (re_idx.size() - tot_geom_features) << std::endl;
+  full_featMatrix = cv::Mat(tot_cells, training_cols, CV_32F);
   
-  if (!produce_features) {
-    std::string cname = "results/lv" + std::to_string(level) + "/"
+  if (mode<3)
+    featMatrix = cv::Mat(tot_cells, training_cols, CV_32F);
+  else
+    featMatrix = cv::Mat(tot_cells, pca_mode+level, CV_32F);
+
+  
+  for (auto &f : features)
+    f.derived_features.resize((1+TOT_GEOM_FEATURES)*level);
+  
+  if (expmode == ExpMode::test) {
+    std::string cname = load_path + "lv" + std::to_string(level) + "/"
                + modes[mode] + (trick_mode ? "_trick" : "") + "/config_data" + std::to_string(level) + ".yaml";
     normalizer = Normalizer(tot_geom_features_across_all_levels, cname.c_str());
-    // normalizer.print();
   }
-  else if (mode>=0) {
+  else {
     store_features_ofname = node["store_path"].as<std::string>();
     if (store_features_ofname.empty()) 
       throw std::runtime_error(
             std::string("\033[1;31mERROR\033[0m. please provide a valid outfile path. Found empty!\n"));
     std::ofstream out(store_features_ofname.c_str(), std::ios::out | std::ios::binary);
     out.close();
-  }
-
-  //STORE IDX RELATION BTW CYLS
-  idxs.resize(grid.size());
-  temp_color.resize(grid.size());
-
+  } 
+  // pre-compute the index from which to inherit features
   if (cyl_!=nullptr) {
+    float angle, sampled_angle, sampled_radius;
+    int row, col, sampled_idx, exdx;
+
+    inherit_idxs.resize(grid.size());
+    prevfeats_num = cyl_->features[0].derived_features.size();
 
     for (int row_idx = 0, i=0; row_idx<steps_num; row_idx++) {
       for (int yaw_idx = 0; yaw_idx<yaw_steps; yaw_idx++, i++) {
         
-        float angle = yaw_idx*yaw_res;
-        
-        float sampled_angle  = angle  + static_cast <float> (rand()) /( static_cast <float> (RAND_MAX/(yaw_res)));
-        float sampled_radius = (start_radius + row_idx*radius_step) + static_cast <float> (rand()) /( static_cast <float> (RAND_MAX/(radius_step)));
+        angle          = yaw_idx*yaw_res;
+        sampled_angle  = angle  + static_cast <float> (rand()) /( static_cast <float> (RAND_MAX/(yaw_res)));
+        sampled_radius = (start_radius + row_idx*radius_step) + static_cast <float> (rand()) /( static_cast <float> (RAND_MAX/(radius_step)));
 
         if (sampled_angle>=M_DOUBLE_PI) sampled_angle = sampled_angle - M_DOUBLE_PI;
         else if (sampled_angle<0.0f)    sampled_angle = M_DOUBLE_PI + sampled_angle;
         
-        int row, col;
         row = (int) std::floor((sampled_radius-cyl_->start_radius)/cyl_->radius_step);
         col = ((int) std::floor((sampled_angle)/cyl_->yaw_res)+cyl_->yaw_steps/2)%cyl_->yaw_steps;
 
-        int sampled_idx = col*cyl_->steps_num + row;
-          
-        int exdx = ((yaw_idx+yaw_steps/2)%yaw_steps)*steps_num + row_idx;
+        sampled_idx = col*cyl_->steps_num + row;
+        exdx = ((yaw_idx+yaw_steps/2)%yaw_steps)*steps_num + row_idx;
 
-        idxs[exdx] = sampled_idx; //save the idx of the correspondent backsector
-        temp_color[exdx] = cyl_->temp_color[sampled_idx];
+        inherit_idxs[exdx] = sampled_idx; //save the idx of the correspondent backsector
 
       } 
     }
   }
-  else {
-    for (int row_idx = 0, i=0; row_idx<steps_num; row_idx++) {
-      for (int yaw_idx = 0; yaw_idx<yaw_steps; yaw_idx++, i++) {
-        int sampled_idx = ((yaw_idx+yaw_steps/2)%yaw_steps)*steps_num + row_idx;
-        idxs[i] = sampled_idx;
-      }
-    }
-
-  }
-
-  if (mode>=0 && !produce_features)
-    loadSVM(node["svm_path"].as<std::string>() + std::string("lv") + std::to_string(level) + std::string("/")
-               + modes[mode] + (trick_mode ? "_trick" : "") + std::string("/svm_model")
-               + (mode>=3 ? std::string("_") + node["pca"].as<std::string>() : "")
-               + std::string("_") + node["nu"].as<std::string>()
-               + std::string("_") + node["gamma"].as<std::string>()
-               + std::string(".bin")
-               );
 }
 
-
-Cylinder::Cylinder(YAML::Node &node,  Synchro *synchro__, Cylinder *cyl_, int tot_geom_features_, int produce_features)
-: Cylinder(node, cyl_, tot_geom_features_, produce_features)
-{
-  synchro_ = synchro__;
+void Cylinder::printSummary() {
+  std::cout << "level: " << std::setw(2) << level << " | "
+            <<  "mode: " << std::setw(18) << modes[mode] << " | "
+            <<   "pca: " << std::setw(4) << (pca_mode>0 ? std::to_string(pca_mode) : "OFF") << " | "
+            << "trick: " << std::setw(4) << (trick_mode ? "ON" : "OFF") << std::endl;
 }
 
-void Cylinder::createTriang() {
+Cylinder_SemKITTI::Cylinder_SemKITTI(YAML::Node &node)
+   : Cylinder(node) {}
+Cylinder_SemKITTI::Cylinder_SemKITTI(YAML::Node &node,  Cylinder *cyl_, ExpMode expmode)
+   : Cylinder(node, cyl_, expmode) {}
 
-  // initialize data structure
-  mesh = std::make_shared<open3d::geometry::TriangleMesh>();
-  mesh->vertices_.resize(4*tot_cells);
-  mesh->triangles_.resize(4*tot_cells);
-  mesh->vertex_colors_.resize(4*tot_cells);
+Cylinder_NuSc::Cylinder_NuSc(YAML::Node &node)
+   : Cylinder(node) {}
+Cylinder_NuSc::Cylinder_NuSc(YAML::Node &node,  Cylinder *cyl_, ExpMode expmode)
+   : Cylinder(node, cyl_, expmode) {}
 
-  // handy variables to store intermediate values
-  double sina, cosa, sina_, cosa_;
-  float angle, r0, r1;
-  int off=0;
-
-  for (float r=start_radius; r<end_radius; r+=radius_step) {
-    r0 = r; r1 = r + radius_step;
-
-    for (float realangle=0; realangle<2*M_PI; realangle+=yaw_res) {
-
-      // clip angle in range [0, 2M_PI]
-      angle = realangle+M_PI;
-           if (angle>=M_DOUBLE_PI) angle = angle - M_DOUBLE_PI;
-      else if (angle<0.0f)         angle = M_DOUBLE_PI + angle;
-
-      sina = sin(angle); sina_ = sin(angle+yaw_res);
-      cosa = cos(angle); cosa_ = cos(angle+yaw_res);
-
-      mesh-> vertices_[off] = Eigen::Vector3d(r0*sina,  r0*cosa,  z);
-      mesh->triangles_[off] = Eigen::Vector3i(off,   off+1, off+2);
-      off++;
-      mesh-> vertices_[off] = Eigen::Vector3d(r1*sina,  r1*cosa,  z);
-      mesh->triangles_[off] = Eigen::Vector3i(off+1, off,   off-1);
-      off++;
-      mesh-> vertices_[off] = Eigen::Vector3d(r0*sina_, r0*cosa_, z);
-      mesh->triangles_[off] = Eigen::Vector3i(off-1, off,   off+1);
-      off++;
-      mesh-> vertices_[off] = Eigen::Vector3d(r1*sina_, r1*cosa_, z);
-      mesh->triangles_[off] = Eigen::Vector3i(off,   off-1, off-2);
-      off++;
-
-    }
-  }
-}
-
-void Cylinder::updateTriang() {
-  Eigen::Vector3d color_;
-  int idx, label, gtlabel;
-  int cont=0;
-
-  for (int row_idx = 0; row_idx<steps_num; row_idx++) {
-    for (int yaw_idx = 0; yaw_idx<yaw_steps; yaw_idx++) {
-
-      idx = ((yaw_idx+yaw_steps/2)%yaw_steps)*steps_num + row_idx;
-      label = grid[idx].predicted_label;//.predicted_label;
-      gtlabel = grid[idx].label;
-
-           if (label==UNKNOWN_CELL_LABEL) color_ = darkgray;
-      else if (label>0) {
-        if (label*gtlabel>0) color_ = tp_color;
-        else color_ = fp_color;
-      }
-      else {
-        if (label*gtlabel>0) color_ = tn_color;
-        else color_ = fn_color;
-      }                         
-
-      // set the color for the cell
-      mesh->vertex_colors_[cont ++] = (color_);
-      mesh->vertex_colors_[cont ++] = (color_);
-      mesh->vertex_colors_[cont ++] = (color_);
-      mesh->vertex_colors_[cont ++] = (color_);
-    }
-  }
-
-  mesh->ComputeVertexNormals();
-  synchro_->addPolarGrid(mesh);
-
-}
-
-void Cylinder::updateTriangGT() {
-  Eigen::Vector3d color_;
-  int idx, label;
-  int cont=0;
-
-  for (int row_idx = 0; row_idx<steps_num; row_idx++) {
-    for (int yaw_idx = 0; yaw_idx<yaw_steps; yaw_idx++, cont++) {
-
-      idx = ((yaw_idx+yaw_steps/2)%yaw_steps)*steps_num + row_idx;
-      label = grid[idx].label;
-
-           if (label==UNKNOWN_CELL_LABEL) color_ = darkgray;
-      else if (label==TRAV_CELL_LABEL)    color_ = tp_color;
-      else                                color_ = tn_color;
-
-      mesh->vertex_colors_[cont ++] = (color_);
-      mesh->vertex_colors_[cont ++] = (color_);
-      mesh->vertex_colors_[cont ++] = (color_);
-      mesh->vertex_colors_[cont ++] = (color_);
-    }
-  }
-
-  mesh->ComputeVertexNormals();
-  synchro_->addPolarGrid(mesh);
-}
-
-// avg_label is the average (trav/non trav) label of the POINTs inside each cell
-// clearly is available only in ground truth evaluation
-// during inference this should be replaced with the output of the svm SVR classifier
 
 void Cylinder::inheritFeatures(Cylinder *cyl_) {
-  // TODO: introduce error if level==0
-  if (training_cols == tot_geom_features) return;
-
-  int prevfeats = cyl_->features[0].derived_features.size();
+  if (training_cols == TOT_GEOM_FEATURES) return;
+  
   std::vector<float> prev_feats;
   int i, j, c;
   
-
   for (i=0; i<tot_cells; i++) {
     if (grid[i].label==UNKNOWN_CELL_LABEL) continue;
     
-    for (j=0; j<prevfeats; j++)
-      features[i].derived_features[j] = cyl_->features[idxs[i]].derived_features[j];
+    for (j=0; j<prevfeats_num; j++)
+      features[i].derived_features[j] = cyl_->features[inherit_idxs[i]].derived_features[j];
 
-    prev_feats = cyl_->features[idxs[i]].toVectorTransformed();
-    for (j=prevfeats, c=0; j<prevfeats+tot_geom_features; j++, c++)
+    prev_feats = cyl_->features[inherit_idxs[i]].toVectorTransformed();
+    for (j=prevfeats_num, c=0; j<prevfeats_num+TOT_GEOM_FEATURES; j++, c++)
       features[i].derived_features[j] = prev_feats[c];
-    features[i].derived_features[j] = cyl_->grid[idxs[i]].predicted_label;
+    features[i].derived_features[j] = cyl_->grid[inherit_idxs[i]].predicted_label;
   }
 
 }
 
 void Cylinder::inheritGTFeatures(Cylinder *cyl_) {
-  // TODO: introduce error if level==0
-  if (training_cols == tot_geom_features) return;
+  if (training_cols == TOT_GEOM_FEATURES) return;
 
-  int prevfeats = cyl_->features[0].derived_features.size();
   std::vector<float> prev_feats;
   int i, j, c;
 
   for (i=0; i<tot_cells; i++) {
     if (grid[i].label==UNKNOWN_CELL_LABEL) continue;
     
-    for (j=0; j<prevfeats; j++)
-      features[i].derived_features[j] = cyl_->features[idxs[i]].derived_features[j];
+    for (j=0; j<prevfeats_num; j++)
+      features[i].derived_features[j] = cyl_->features[inherit_idxs[i]].derived_features[j];
 
-    prev_feats = cyl_->features[idxs[i]].toVectorTransformed();
-    for (j=prevfeats, c=0; j<prevfeats+tot_geom_features; j++, c++)
+    prev_feats = cyl_->features[inherit_idxs[i]].toVectorTransformed();
+    for (j=prevfeats_num, c=0; j<prevfeats_num+TOT_GEOM_FEATURES; j++, c++)
       features[i].derived_features[j] = prev_feats[c];
-    features[i].derived_features[j] = cyl_->grid[idxs[i]].label;
+    features[i].derived_features[j] = cyl_->grid[inherit_idxs[i]].label;
   }
   
 }
@@ -395,7 +207,9 @@ void Cylinder::resetGrid() {
   }
 }
 
-void Cylinder::computeTravGT_SemKITTI(std::vector<int> &labels) {
+void Cylinder::computeTravGT(std::vector<int> &labels) {}
+
+void Cylinder_SemKITTI::computeTravGT(std::vector<int> &labels) {
   int trav_cont, non_trav_cont, road, sidewalk, label;
   Cell *cell;
 
@@ -424,15 +238,14 @@ void Cylinder::computeTravGT_SemKITTI(std::vector<int> &labels) {
         else cell->label = UNKNOWN_CELL_LABEL;
     }
 
-    y_train.at<float>(valid_rows, 0) = cell->label;
+    GT_labels_vector.at<float>(valid_rows, 0) = cell->label;
     valid_rows++;
 
   }
 
-  std::cout << "LEVEL " << level << std::endl;
 }
 
-void Cylinder::computeTravGT_NuSc(std::vector<int> &labels) {
+void Cylinder_NuSc::computeTravGT(std::vector<int> &labels) {
   int trav_cont, non_trav_cont;
   int road, sidewalk;
   Cell *cell;
@@ -467,7 +280,7 @@ void Cylinder::computeTravGT_NuSc(std::vector<int> &labels) {
         else cell->label = UNKNOWN_CELL_LABEL;
     }
 
-    y_train.at<float>(valid_rows, 0) = cell->label;
+    GT_labels_vector.at<float>(valid_rows, 0) = cell->label;
     valid_rows++;
 
   }
@@ -514,44 +327,38 @@ void Cylinder::computePredictedLabel(std::vector<int> &labels) {
 
 }
 
+// 17 17 1 17 1 17 1 17 1 17 1
+//       34   52
 void Cylinder::computeFeaturesCols() {
+  int i, l;
   switch(mode) {
     case 0: // geom
     case 3: // geom_pca
-      training_cols = tot_geom_features;
-      tot_geom_features_across_all_levels = tot_geom_features;
-      for (int i=0; i<17; i++) re_idx.push_back(i);
+      training_cols = TOT_GEOM_FEATURES;
+      tot_geom_features_across_all_levels = TOT_GEOM_FEATURES;
+      for (i=0; i<TOT_GEOM_FEATURES; i++) re_idx.push_back(i);
       break;
     case 1: // geom_label
     case 4: // geom_pca_label
       if (level==0) throw std::runtime_error(std::string("\033[1;31mERROR!\033[0m mode at level 0 not allowed!"));
-      training_cols = tot_geom_features + level;
-      tot_geom_features_across_all_levels = tot_geom_features;
-      if (level==1) {
-        for (int i=0; i<17; i++) re_idx.push_back(i);
-        re_idx.push_back(34);
-      }
-      else if (level==2) {
-        for (int i=0; i<17; i++) re_idx.push_back(i);
-        re_idx.push_back(34);
-        re_idx.push_back(52);
-      }
+      training_cols = TOT_GEOM_FEATURES + level;
+      tot_geom_features_across_all_levels = TOT_GEOM_FEATURES;
+      for (i=0; i<TOT_GEOM_FEATURES; i++) re_idx.push_back(i);
+      for (l=1; l<=level; l++) re_idx.push_back(TOT_GEOM_FEATURES + (TOT_GEOM_FEATURES+1)*l -1);
+      
       break;
     case 2: // geom_all
     case 5: // geom_pca_all_label
       if (level==0) throw std::runtime_error(std::string("\033[1;31mERROR!\033[0m mode at level 0 not allowed!"));
-      training_cols = (tot_geom_features*(level+1)) + level;
-      if (level==1) {
-        tot_geom_features_across_all_levels = tot_geom_features*2;
-        for (int i=0; i<35; i++) re_idx.push_back(i);
+      training_cols = (TOT_GEOM_FEATURES*(level+1)) + level;
+      for (i=0; i<TOT_GEOM_FEATURES; i++) re_idx.push_back(i);
+
+      for (l=1; l<=level; l++) {
+        int end_geom_feats = TOT_GEOM_FEATURES + (TOT_GEOM_FEATURES+1)*(l-1);
+        for (i=end_geom_feats; i<end_geom_feats+TOT_GEOM_FEATURES; i++) re_idx.push_back(i);
       }
-      else if (level==2) {
-        tot_geom_features_across_all_levels = tot_geom_features*3;
-        for (int i=0; i<34; i++) re_idx.push_back(i);
-        for (int i=35; i<52; i++) re_idx.push_back(i);
-        re_idx.push_back(34);
-        re_idx.push_back(52);
-      }
+      for (l=1; l<=level; l++) re_idx.push_back(TOT_GEOM_FEATURES + (TOT_GEOM_FEATURES+1)*l -1);
+
       break;
     default:
       throw std::runtime_error(std::string("\033[1;31mERROR!\033[0m Mode not recognized!"));
@@ -560,31 +367,54 @@ void Cylinder::computeFeaturesCols() {
   if (pca_mode<0 && mode>=3)
     throw std::runtime_error(std::string("\033[1;31mERROR!\033[0m Mode with pca but no pca_mode set!"));
 
-  if (pca_mode>tot_geom_features_across_all_levels)
+  if (pca_mode>TOT_GEOM_FEATURES)
     throw std::runtime_error(std::string("\033[1;31mERROR!\033[0m fouond pca_mode > tot_geom_features_across_all_levels!"));
 
-  if (level==1) ref_label_idx = 17;
-  else if (level==2) ref_label_idx = 35;
+  inherited_labels_size = re_idx.size()-tot_geom_features_across_all_levels;
 
-  der_feats_size=(re_idx.size()-tot_geom_features_across_all_levels);
-
-
-  std::cout << "computed Training Cols (before pca) : " << training_cols << std::endl;
-  std::cout << "to check re_idx size                : " << re_idx.size() << std::endl;
 }
 
-void Cylinder::loadSVM(std::string path) {
-  std::cout << "Loading model from " << path << " ..." << std::flush;
+void Cylinder::loadPCAConfigs(YAML::Node &node)
+{
+  if (node["pca"]) pca_mode = node["pca"].as<int>();
+
+  if (mode>=3) {
+    std::string cname = load_path + "lv" + std::to_string(level) + "/"
+                + modes[mode] + (trick_mode ? "_trick" : "") + "/pca_config_data"
+                + std::to_string(pca_mode) + ".yaml";
+    
+    std::cout << "  loading   PCA from " << cname << std::flush;
+    
+    cv::FileStorage fs(cname, cv::FileStorage::READ);
+    fs["mean"]    >> pca.mean;
+    fs["vectors"] >> pca.eigenvectors;
+    fs["values"]  >> pca.eigenvalues;
+    fs.release();
+    
+    std::cout << " done!" << std::endl;
+  }
+}
+
+void Cylinder::loadSVM(YAML::Node &node) {
+  std::string path = load_path + "lv" + std::to_string(level) + "/"
+      + modes[mode] + (trick_mode ? "_trick" : "") + "/svm_model"
+      + (mode>=3 ? "_" + node["pca"].as<std::string>() : "") + "_" 
+      + node["nu"].as<std::string>() + "_" 
+      + node["gamma"].as<std::string>() + ".bin";
+  
+  std::cout << "  loading model from " << path << " ... " << std::flush;
+
+  if (!check_file_exists(path)) 
+    throw std::runtime_error("\033[1;31mERROR\033[0m. level "
+        + std::to_string(level) + " has invalid SVM path: " + path + ".\n");
+
   model = cv::ml::SVM::load(path);
   if (!model->isTrained())
-    throw std::runtime_error(
-          std::string("\033[1;31mERROR\033[0m. cyl of level ") 
-        + std::to_string(level) + std::string(" has invalid SVM path: ")
-        + path + std::string(".\n"));
+    throw std::runtime_error("\033[1;31mERROR\033[0m.  level "
+        + std::to_string(level) + " has invalid SVM model: it's not trained!");
 
   std::cout << " done!" << std::endl;
 }
-
 
 
 void Cylinder::process(Eigen::MatrixXd &scene_normal, std::vector<Eigen::Vector3d> &points) {
@@ -592,62 +422,51 @@ void Cylinder::process(Eigen::MatrixXd &scene_normal, std::vector<Eigen::Vector3
 
   std::vector<float> feat;
   float *features_matrix_data_row;
-  int r, valid_rows;
+  float plab, pred;
+  int r, c, valid_rows=0;
 
-  // fill cv::Mat X_train
-  for (r=0, valid_rows=0; r<tot_cells; r++) {
+  // fill cv::Mat full_featMatrix
+  for (r=0; r<tot_cells; r++) {
     if (grid[r].label == UNKNOWN_CELL_LABEL)
       continue;
 
     feat = features[r].toVectorTransformed();
-    features_matrix_data_row = X_train.ptr<float>(valid_rows);
-    for (int c=0; c<training_cols; c++) features_matrix_data_row[c] = feat[re_idx[c]];
+    features_matrix_data_row = full_featMatrix.ptr<float>(valid_rows);
+    for (c=0; c<training_cols; c++) features_matrix_data_row[c] = feat[re_idx[c]];
       
-    remap_idxs[valid_rows] = r;
-    valid_rows++;
+    remap_idxs[valid_rows++] = r;
   }
 
-  
-
-  normalizer.normalize(X_train);
+  normalizer.normalize(full_featMatrix);
 
   if (mode>=3) {
-    int der_feats_size=(re_idx.size()-tot_geom_features_across_all_levels);
 
-    tmp = cv::Mat(valid_rows, pca_mode+der_feats_size, CV_32F);
+    featMatrix = cv::Mat(valid_rows, pca_mode+inherited_labels_size, CV_32F);
     
-    
+    if (level>0 && inherited_labels_size>0) 
+      full_featMatrix(cv::Range(0, valid_rows), cv::Range(tot_geom_features_across_all_levels, full_featMatrix.cols))
+      .copyTo(featMatrix(cv::Range(0, valid_rows), cv::Range(pca_mode, featMatrix.cols)));
 
-    if (level>0 && der_feats_size>0) 
-      X_train(cv::Range(0, valid_rows), cv::Range(tot_geom_features_across_all_levels, X_train.cols))
-      .copyTo(tmp(cv::Range(0, valid_rows), cv::Range(pca_mode, tmp.cols)));
-
-    pca.project(X_train(cv::Range(0, valid_rows), cv::Range(0, tot_geom_features_across_all_levels)), 
-                    tmp(cv::Range(0, valid_rows), cv::Range(0, pca_mode)));
+    pca.project(full_featMatrix(cv::Range(0, valid_rows), cv::Range(0, tot_geom_features_across_all_levels)), 
+                    featMatrix(cv::Range(0, valid_rows), cv::Range(0, pca_mode)));
   }
   else
-    tmp = X_train(cv::Range(0, valid_rows), cv::Range(0, X_train.cols));
+    featMatrix = full_featMatrix(cv::Range(0, valid_rows), cv::Range(0, full_featMatrix.cols));
   
-  tmetric.resetAll();
-  model->predict(tmp, predictions_vector(cv::Range(0, valid_rows), cv::Range(0, 1)), cv::ml::StatModel::RAW_OUTPUT);
+  tmetric.resetTime();
+  model->predict(featMatrix, predictions_vector(cv::Range(0, valid_rows), cv::Range(0, 1)), cv::ml::StatModel::RAW_OUTPUT);
   tmetric.checkpointTime();
-  std::cout << "level " << level << " chekc: " << tmetric.checkpointTime_ << " ms" << std::endl;
 
-  float plab, pred;
-  for (int r=0; r < valid_rows; r++) {
+  for (r=0; r < valid_rows; r++) {
     pred = predictions_vector.at<float>(r, 0);
-    plab = pred > 0 ? 1.0f : -1.0f;
+    plab = pred > 0 ? TRAV_CELL_LABEL : NOT_TRAV_CELL_LABEL;
     
-    // // trick!
-    if (level>0 && tmp.at<float>(r, pca_mode+level-1) > 1.5) pred = 1.0f;
+    // trick!
+    if (level>0 && featMatrix.at<float>(r, pca_mode+level-1) > 0.5) pred = TRAV_CELL_LABEL;
 
     grid[remap_idxs[r]].predicted_label = plab; // if trick is wanted to be float, put pred
 
-    if (!(r%100)) (synchro_->cv).notify_one();
   }
-
-  // remove when computing latency
-  (synchro_->cv).notify_one();
 
 }
 
@@ -696,16 +515,12 @@ void Cylinder::filterOutliers() {
 
 
 void Cylinder::computeFeatures(Eigen::MatrixXd &scene_normal, std::vector<Eigen::Vector3d> &points) {
-  int status, tot=0;
+  bool status;
   for (int r=0; r<(int)features.size(); r++) {
     if (grid[r].points_idx.size()<2) continue;
     status = features[r].computeFeatures(&grid[r], scene_normal, points, area[r]);
-    
-    if (!status) {
-      grid[r].label=UNKNOWN_CELL_LABEL; tot++;
-    }
+    if (!status) grid[r].label=UNKNOWN_CELL_LABEL; 
   }
-  std::cout << "TOT: " << tot << "\n";
 }
 
 void Cylinder::storeFeatures() {
@@ -740,7 +555,6 @@ void Cylinder::storeFeaturesToFile(std::string name) {
   out.close();
 }
 
-
 void Cylinder::produceFeaturesRoutine(
                     std::vector<Eigen::Vector3d> &points, std::vector<int> &labels, 
                     Eigen::MatrixXd &scene_normal, Cylinder *back_cyl) {
@@ -752,8 +566,19 @@ void Cylinder::produceFeaturesRoutine(
 
   resetGrid();
   sortBins_cyl(points);
-  computeTravGT_SemKITTI(labels);
+  computeTravGT(labels);
   computeFeatures(scene_normal, points);
   if (level>0) inheritGTFeatures(back_cyl);
   storeFeatures();
+}
+
+void Cylinder::OnlineRoutine(
+                    DataLoader &dl, Cylinder *back_cyl) {
+  resetGrid();
+  sortBins_cyl(dl.points);
+  computeTravGT(dl.labels);
+  computeFeatures(dl.scene_normal, dl.points);
+  if (level>0) inheritGTFeatures(back_cyl);
+  process(dl.scene_normal, dl.points);
+  computeAccuracy();
 }

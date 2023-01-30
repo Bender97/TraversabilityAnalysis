@@ -1,8 +1,5 @@
 #pragma once
 
-#ifndef FEATURE
-#define FEATURE
-
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -29,8 +26,6 @@ class Feature {
     float unevenness;
     float surface_density;
     float z_diff;
-    float internal_density;
-    float volume;
 
     float cx, cy, cz, d1, d2, d3, d, normal_magnitude, numpoints;
     float a11, a12, a13, a22, a23, a33, ax, ay, az;
@@ -55,9 +50,5 @@ class Feature {
     int fromFileLine(std::ifstream &in, int derived_features_num);
     int ignoreFeatureFromFile(std::ifstream &in, int derived_features_num);
 
-#if !defined(TRAIN) && !defined(TEST_MODEL)
     int computeFeatures(Cell *cell, Eigen::MatrixXd &scene_normal, std::vector<Eigen::Vector3d> &points, float area);
-#endif
 };
-
-#endif

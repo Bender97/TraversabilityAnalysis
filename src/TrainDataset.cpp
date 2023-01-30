@@ -345,45 +345,6 @@ void TrainDataset::load() {
 
     std::cout << "now X_train has " << X_train.cols << std::endl;
   }
-  
-
-
-  // ///// sample feature rows to select only a subsample of the whole training set
-  // taken.resize(tot_samples_found, false);
-  // counters[0] = 0; counters[1] = 0;
-
-  // cv::Mat X_small(num_entries_to_train_on, (int) X_train.cols, CV_32F);
-  // cv::Mat y_small(num_entries_to_train_on, 1, CV_32FC1);
-  // float *trow;
-
-  // // generate numbers
-  // std::default_random_engine rand_dev{static_cast<long unsigned int>(1)};;
-  // std::mt19937               generator(rand_dev());
-  // std::uniform_int_distribution<>  distr(0, tot_samples_found-1);
-
-  // float half_netto = num_entries_to_train_on/2.0f;
-  // float *features_matrix_data_row;
-
-  // int num;
-  // for (int t=0; t<num_entries_to_train_on; t++)  {
-  //   bool flag = true;
-  //   while(flag) {
-  //      num = distr(generator);
-  //      //std::cout << "from " << 0 << " to " << features_all.size() << " sampled: " << num << " " << taken[num] << " " << counters[0] << " " << counters[1] << std::endl;
-  //      if (taken[num]==false && (!need_to_balance_flag || counters[((int)y_train.at<float>(num)+1)>>1]<half_netto) ) flag=false;
-  //   }
-
-  //   taken[num]=true;
-  //   trow = X_train.ptr<float>(num);
-  //   features_matrix_data_row = X_small.ptr<float>(t);
-  //   for (int c=0; c<X_train.cols; c++) features_matrix_data_row[c] = trow[c];
-  //   y_small.at<float>(t) = y_train.at<float>(num);
-  //   counters[((int)y_train.at<float>(num)+1)>>1]++;
-  // }
-
-
-  // X_train = X_small;
-  // y_train = y_small;
 
   std::cout << X_train.rows << " " << X_train.cols << std::endl;
   std::cout << y_train.rows << " " << y_train.cols << std::endl;

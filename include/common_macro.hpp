@@ -1,8 +1,11 @@
 #pragma once
 
-#ifndef COMMON_HPP
-#define COMMON_HPP
+#ifndef COMMON_MACRO_HPP
+#define COMMON_MACRO_HPP
 
+#define TOT_GEOM_FEATURES 17
+
+enum class ExpMode {produce, DL, test};
 
 #define SCALAR_PRODUCT_2p(vec1, vec2) ( ((vec1(0))*((vec2)(0)) + (vec1(1))*((vec2)(1)) + (vec1(2))*((vec2)(2))) )
 #define NUM2SQ(x) ((x)*(x))
@@ -11,14 +14,12 @@
 //#define MAX(a, b) (a>b ? a : b)
 #define MALLOC_(type,n) (type *)malloc((n)*sizeof(type))
 
-#define UNKNOWN_CELL_LABEL 2
-#define NOT_TRAV_CELL_LABEL  -1
-#define TRAV_CELL_LABEL  1
+#define UNKNOWN_CELL_LABEL 2.0f
+#define NOT_TRAV_CELL_LABEL  -1.0f
+#define TRAV_CELL_LABEL  1.0f
 
 #define MIN_NUM_POINTS_IN_CELL 2
 
-#define LOWEST_Z_VALUE -100.f
-#define HIGHEST_Z_VALUE 100.0f
 
 
 #define IS_ROAD(l)            ( (l) == 40 )
@@ -50,6 +51,5 @@
 #define POINTBELONGSTOROAD_NU(l) ( (l)>=24 && (l)<=27 )
 
 #define LABELED_NU(l) ( (l) > 0 )
-
 
 #endif
