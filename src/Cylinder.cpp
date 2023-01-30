@@ -41,11 +41,13 @@ Cylinder::Cylinder(YAML::Node &node) {
   
 }
 
-Cylinder::Cylinder(YAML::Node &node,  Cylinder *cyl_, ExpMode expmode) : Cylinder(node)
+Cylinder::Cylinder(YAML::Node &node,  Cylinder *cyl_, ExpMode expmode_) : Cylinder(node)
 {
 
   level = 0; mode = -1; trick_mode=0; pca_mode=-1;
   if (cyl_!=nullptr) level = cyl_->level + 1;
+
+  expmode = expmode_;
 
   if (node["mode"]) mode = node["mode"].as<int>();
 
@@ -61,12 +63,12 @@ Cylinder::Cylinder(YAML::Node &node,  Cylinder *cyl_, ExpMode expmode) : Cylinde
   
   loadPCAConfigs(node);
   computeFeaturesCols();
-  if (expmode == ExpMode::test) loadSVM(node);
+  loadSVM(node);
 
-  full_featMatrix = cv::Mat(tot_cells, training_cols, CV_32F);
+  full_featMatrix = cv::Mat(tot_cells, max_feats_num, CV_32F);
   
-  if (mode<3)
-    featMatrix = cv::Mat(tot_cells, training_cols, CV_32F);
+  if (mode<3 || expmode==ExpMode::produce)
+    featMatrix = cv::Mat(tot_cells, max_feats_num, CV_32F);
   else
     featMatrix = cv::Mat(tot_cells, pca_mode+level, CV_32F);
 
@@ -80,10 +82,14 @@ Cylinder::Cylinder(YAML::Node &node,  Cylinder *cyl_, ExpMode expmode) : Cylinde
     normalizer = Normalizer(tot_geom_features_across_all_levels, cname.c_str());
   }
   else {
-    store_features_ofname = node["store_path"].as<std::string>();
+    std::string ofname;
+    if (node["store_features_filename"]) ofname = node["store_features_filename"].as<std::string>();
+    else throw std::runtime_error(std::string("\033[1;31mERROR\033[0m. Please provide a valid outfile name. Found empty!\n"));
+
+    store_features_ofname = sanitize(save_path) + ofname + std::to_string(level) + ".bin";
+    
     if (store_features_ofname.empty()) 
-      throw std::runtime_error(
-            std::string("\033[1;31mERROR\033[0m. please provide a valid outfile path. Found empty!\n"));
+      throw std::runtime_error(std::string("\033[1;31mERROR\033[0m. Please provide a valid outfile path. Found empty!\n"));
     std::ofstream out(store_features_ofname.c_str(), std::ios::out | std::ios::binary);
     out.close();
   } 
@@ -137,7 +143,7 @@ Cylinder_NuSc::Cylinder_NuSc(YAML::Node &node,  Cylinder *cyl_, ExpMode expmode)
 
 
 void Cylinder::inheritFeatures(Cylinder *cyl_) {
-  if (training_cols == TOT_GEOM_FEATURES) return;
+  if (max_feats_num == TOT_GEOM_FEATURES) return;
   
   std::vector<float> prev_feats;
   int i, j, c;
@@ -157,7 +163,7 @@ void Cylinder::inheritFeatures(Cylinder *cyl_) {
 }
 
 void Cylinder::inheritGTFeatures(Cylinder *cyl_) {
-  if (training_cols == TOT_GEOM_FEATURES) return;
+  if (max_feats_num == TOT_GEOM_FEATURES) return;
 
   std::vector<float> prev_feats;
   int i, j, c;
@@ -334,14 +340,14 @@ void Cylinder::computeFeaturesCols() {
   switch(mode) {
     case 0: // geom
     case 3: // geom_pca
-      training_cols = TOT_GEOM_FEATURES;
+      max_feats_num = TOT_GEOM_FEATURES;
       tot_geom_features_across_all_levels = TOT_GEOM_FEATURES;
       for (i=0; i<TOT_GEOM_FEATURES; i++) re_idx.push_back(i);
       break;
     case 1: // geom_label
     case 4: // geom_pca_label
       if (level==0) throw std::runtime_error(std::string("\033[1;31mERROR!\033[0m mode at level 0 not allowed!"));
-      training_cols = TOT_GEOM_FEATURES + level;
+      max_feats_num = TOT_GEOM_FEATURES + level;
       tot_geom_features_across_all_levels = TOT_GEOM_FEATURES;
       for (i=0; i<TOT_GEOM_FEATURES; i++) re_idx.push_back(i);
       for (l=1; l<=level; l++) re_idx.push_back(TOT_GEOM_FEATURES + (TOT_GEOM_FEATURES+1)*l -1);
@@ -350,7 +356,7 @@ void Cylinder::computeFeaturesCols() {
     case 2: // geom_all
     case 5: // geom_pca_all_label
       if (level==0) throw std::runtime_error(std::string("\033[1;31mERROR!\033[0m mode at level 0 not allowed!"));
-      training_cols = (TOT_GEOM_FEATURES*(level+1)) + level;
+      max_feats_num = (TOT_GEOM_FEATURES*(level+1)) + level;
       for (i=0; i<TOT_GEOM_FEATURES; i++) re_idx.push_back(i);
 
       for (l=1; l<=level; l++) {
@@ -364,7 +370,7 @@ void Cylinder::computeFeaturesCols() {
       throw std::runtime_error(std::string("\033[1;31mERROR!\033[0m Mode not recognized!"));
   }
 
-  if (pca_mode<0 && mode>=3)
+  if (expmode == ExpMode::test && mode>=3 && pca_mode<0)
     throw std::runtime_error(std::string("\033[1;31mERROR!\033[0m Mode with pca but no pca_mode set!"));
 
   if (pca_mode>TOT_GEOM_FEATURES)
@@ -376,6 +382,7 @@ void Cylinder::computeFeaturesCols() {
 
 void Cylinder::loadPCAConfigs(YAML::Node &node)
 {
+  if (expmode != ExpMode::test) return;
   if (node["pca"]) pca_mode = node["pca"].as<int>();
 
   if (mode>=3) {
@@ -396,6 +403,9 @@ void Cylinder::loadPCAConfigs(YAML::Node &node)
 }
 
 void Cylinder::loadSVM(YAML::Node &node) {
+  
+  if (expmode != ExpMode::test) return;
+
   std::string path = load_path + "lv" + std::to_string(level) + "/"
       + modes[mode] + (trick_mode ? "_trick" : "") + "/svm_model"
       + (mode>=3 ? "_" + node["pca"].as<std::string>() : "") + "_" 
@@ -432,7 +442,7 @@ void Cylinder::process(Eigen::MatrixXd &scene_normal, std::vector<Eigen::Vector3
 
     feat = features[r].toVectorTransformed();
     features_matrix_data_row = full_featMatrix.ptr<float>(valid_rows);
-    for (c=0; c<training_cols; c++) features_matrix_data_row[c] = feat[re_idx[c]];
+    for (c=0; c<max_feats_num; c++) features_matrix_data_row[c] = feat[re_idx[c]];
       
     remap_idxs[valid_rows++] = r;
   }
@@ -523,8 +533,8 @@ void Cylinder::computeFeatures(Eigen::MatrixXd &scene_normal, std::vector<Eigen:
   }
 }
 
-void Cylinder::storeFeatures() {
-  std::ofstream out(store_features_ofname.c_str(), std::ios::app | std::ios::binary);
+void Cylinder::storeFeaturesToFile() {
+  std::ofstream out(store_features_ofname.c_str(), std::ios::binary);
   if (!out) // didn't open, do some error reporting here
       std::cout << "OUTSTREAM opening error - " << store_features_ofname << std::endl;
   //int cont=0;
@@ -539,37 +549,19 @@ void Cylinder::storeFeatures() {
   out.close();
 }
 
-void Cylinder::storeFeaturesToFile(std::string name) {
-  std::ofstream out(name.c_str(), std::ios::binary);
-  if (!out) // didn't open, do some error reporting here
-      std::cout << "OUTSTREAM opening error - " << store_features_ofname << std::endl;
-  //int cont=0;
-  for (int i=0; i<(int) grid.size(); i++) {
-    if (grid[i].label == UNKNOWN_CELL_LABEL) continue;
-    //cont++;
-    features[i].toFile(out);
-    float lab = static_cast< float > (grid[i].label);
-    out.write( reinterpret_cast<const char*>( &(lab) ), sizeof( float ));
-  }
-  //std::cout << "written " << cont << std::endl;
-  out.close();
-}
-
-void Cylinder::produceFeaturesRoutine(
-                    std::vector<Eigen::Vector3d> &points, std::vector<int> &labels, 
-                    Eigen::MatrixXd &scene_normal, Cylinder *back_cyl) {
+void Cylinder::produceFeaturesRoutine(DataLoader &dl, Cylinder *back_cyl) {
   if (back_cyl==nullptr && level>0) {
     throw std::runtime_error(
           std::string("\033[1;31mERROR\033[0m. provided a cylinder of level ") 
         + std::to_string(level) + std::string(" with nullptr back cylinder.\n"));
   }
-
   resetGrid();
-  sortBins_cyl(points);
-  computeTravGT(labels);
-  computeFeatures(scene_normal, points);
+  sortBins_cyl(dl.points);
+  computeTravGT(dl.labels);
+  computeFeatures(dl.scene_normal, dl.points);
   if (level>0) inheritGTFeatures(back_cyl);
-  storeFeatures();
+  computeAccuracy();
+  storeFeaturesToFile();
 }
 
 void Cylinder::OnlineRoutine(

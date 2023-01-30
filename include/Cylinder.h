@@ -50,6 +50,8 @@ public:
   int tot_cells;  // redundant but for optimization (often used)
   int level;
 
+  ExpMode expmode;
+
   std::vector<Cell>    grid;
   std::vector<Feature> features;
   std::vector<float>   area;
@@ -73,7 +75,7 @@ public:
   std::string load_path, save_path;
   cv::Ptr<cv::ml::SVM> model;
   std::vector<std::string> modes = {"geom", "geom_label", "geom_all", "geom_pca", "geom_pca_label", "geom_pca_all_label"};
-  int training_cols, tot_geom_features_across_all_levels;
+  int max_feats_num, tot_geom_features_across_all_levels;
   int mode, pca_mode, trick_mode;
 
   Cylinder(YAML::Node &node);
@@ -101,13 +103,12 @@ public:
   void computeAccuracy();
   void filterOutliers();
 
-  void storeFeatures();
-  void storeFeaturesToFile(std::string name);
+  void storeFeaturesToFile();
 
   void inheritFeatures(Cylinder *cyl_);
   void inheritGTFeatures(Cylinder *cyl_);
 
-  void produceFeaturesRoutine(std::vector<Eigen::Vector3d> &points, std::vector<int> &labels, Eigen::MatrixXd &scene_normal, Cylinder *cyl_);
+  void produceFeaturesRoutine(DataLoader &dl, Cylinder *back_cyl);
   void OnlineRoutine(DataLoader &dl, Cylinder *cyl_);
 
 

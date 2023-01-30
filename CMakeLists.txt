@@ -85,9 +85,9 @@ SET (custom_libs cylinder feature normalizer color_util yaml-cpp metric results 
 
 
 
-# # Produce Feature
-# add_executable(mtmain src/mtmain.cpp)
-# target_link_libraries(mtmain ${Boost_LIBRARIES} ${Boost_FILESYSTEM_LIBRARY} ${custom_libs} ${OpenCV_LIBS} )
+# Produce Feature
+add_executable(mtmain src/mtmain.cpp)
+target_link_libraries(mtmain ${Boost_LIBRARIES} ${Boost_FILESYSTEM_LIBRARY} ${custom_libs} ${OpenCV_LIBS} )
 # #
 # # Train
 # add_executable(train src/train.cpp)
