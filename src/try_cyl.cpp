@@ -102,7 +102,7 @@ int main (int argc, char** argv)
       dl.readData(seq, sample_idx, sample_data);
       bt.reset();
       for (auto cyl : cyls)
-        cyl->OnlineRoutine_Profile(dl, cyl->level ? cyls[cyl->level-1] : nullptr); 
+        cyl->OnlineRoutine(dl, cyl->level ? cyls[cyl->level-1] : nullptr); 
       std::cout << "idx " << sample_idx << " total latency: " << bt.elapsedTimeMs() << " ms" << std::endl;
      
       handleOut(cyls, sample_idx);

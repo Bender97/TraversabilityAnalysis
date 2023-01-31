@@ -106,7 +106,7 @@ public:
 
   void loadPCAConfigs(YAML::Node &node);
 
-  void sortBins_cyl(std::vector<Eigen::Vector3d> &points, std::vector<float> &distances);
+  void sortBins_cyl(std::vector<Eigen::Vector3d> &points);
 
   void resetGrid();
 

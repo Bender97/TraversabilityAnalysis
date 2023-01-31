@@ -153,7 +153,7 @@ void Cylinder::inheritFeatures(Cylinder *cyl_) {
   int i, j, c;
   
   for (i=0; i<tot_cells; i++) {
-    if (grid[i].label==UNKNOWN_CELL_LABEL) continue;
+    if (grid[i].status==UNPREDICTABLE) continue;
     
     for (j=0; j<prevfeats_num; j++)
       features[i].derived_features[j] = cyl_->features[inherit_idxs[i]].derived_features[j];
@@ -173,7 +173,7 @@ void Cylinder::inheritGTFeatures(Cylinder *cyl_) {
   int i, j, c;
 
   for (i=0; i<tot_cells; i++) {
-    if (grid[i].label==UNKNOWN_CELL_LABEL) continue;
+    if (grid[i].status==UNPREDICTABLE) continue;
     
     for (j=0; j<prevfeats_num; j++)
       features[i].derived_features[j] = cyl_->features[inherit_idxs[i]].derived_features[j];
@@ -186,7 +186,7 @@ void Cylinder::inheritGTFeatures(Cylinder *cyl_) {
   
 }
 
-void Cylinder::sortBins_cyl(std::vector<Eigen::Vector3d> &points, std::vector<float> &distances) {
+void Cylinder::sortBins_cyl(std::vector<Eigen::Vector3d> &points) {
   int row, col, ps;
   float radius, yaw;
   Eigen::Vector3d *p;
@@ -200,16 +200,17 @@ void Cylinder::sortBins_cyl(std::vector<Eigen::Vector3d> &points, std::vector<fl
     // assumption: no x=y=0 since it's the laser origin
     yaw = std::atan2((*p)(0), (*p)(1)) + M_PI;
 
-    row = int_floor(yaw / yaw_res);
-    col = int_floor((radius-start_radius) / radius_step);
-    row = (row + yaw_steps_half) % yaw_steps;
+    col = int_floor(yaw / yaw_res);
+    row = int_floor((radius-start_radius) / radius_step);
+    col = (col + yaw_steps_half) % yaw_steps;
 
-    grid[row*steps_num + col].points_idx.push_back(i);
+    grid[col*steps_num + row].points_idx.push_back(i);
   }
 }
 
 void Cylinder::resetGrid() {
   for (auto &cell: grid) {
+    cell.status = UNPREDICTABLE;
     cell.label = UNKNOWN_CELL_LABEL;
     cell.predicted_label = UNKNOWN_CELL_LABEL;
     cell.points_idx.clear();
@@ -225,7 +226,6 @@ void Cylinder_SemKITTI::computeTravGT(std::vector<int> &labels) {
   for (int r=0, valid_rows=0; r<tot_cells; r++) {
     cell = &(grid[r]);
     if (cell->points_idx.size() < MIN_NUM_POINTS_IN_CELL) {
-      cell->label = UNKNOWN_CELL_LABEL;
       continue;
     }
 
@@ -244,7 +244,7 @@ void Cylinder_SemKITTI::computeTravGT(std::vector<int> &labels) {
     else {
         if (non_trav_cont > 3 ) cell->label = NOT_TRAV_CELL_LABEL;
         else if (trav_cont > 1) cell->label = TRAV_CELL_LABEL;
-        else cell->label = UNKNOWN_CELL_LABEL;
+        // else cell->label = UNKNOWN_CELL_LABEL;
     }
 
     GT_labels_vector.at<float>(valid_rows, 0) = cell->label;
@@ -261,8 +261,7 @@ void Cylinder_NuSc::computeTravGT(std::vector<int> &labels) {
 
   for (int r=0, valid_rows=0; r<tot_cells; r++) {
     cell = &(grid[r]);
-    if (cell->points_idx.size() < 2) {
-      cell->label = UNKNOWN_CELL_LABEL;
+    if (cell->points_idx.size() < MIN_NUM_POINTS_IN_CELL) {
       continue;
     }
 
@@ -286,7 +285,7 @@ void Cylinder_NuSc::computeTravGT(std::vector<int> &labels) {
     else {
         if (non_trav_cont > 3 ) cell->label = NOT_TRAV_CELL_LABEL;
         else if (trav_cont > 1) cell->label = TRAV_CELL_LABEL;
-        else cell->label = UNKNOWN_CELL_LABEL;
+        // else cell->label = UNKNOWN_CELL_LABEL;
     }
 
     GT_labels_vector.at<float>(valid_rows, 0) = cell->label;
@@ -303,7 +302,7 @@ void Cylinder::computePredictedLabel(std::vector<int> &labels) {
 
   for (auto &cell : grid) {
     if (cell.points_idx.size() < MIN_NUM_POINTS_IN_CELL) {
-      cell.label = UNKNOWN_CELL_LABEL;
+      // cell.label = UNKNOWN_CELL_LABEL;
       continue;
     }
 
@@ -328,9 +327,7 @@ void Cylinder::computePredictedLabel(std::vector<int> &labels) {
           cell.predicted_label = NOT_TRAV_CELL_LABEL;
         else if (trav_cont > 1)
           cell.predicted_label = TRAV_CELL_LABEL;
-        else {
-          cell.predicted_label = UNKNOWN_CELL_LABEL;
-        }
+        // else cell.predicted_label = UNKNOWN_CELL_LABEL;
     }
   }
 
@@ -364,6 +361,7 @@ void Cylinder::computePredictedLabel(std::vector<int> &labels) {
  * geom_pca_label     #2 -> [:17] + [34] + [52] + pca[:17] // reorder
  * geom_pca_all_label #2 -> [:34] + [35:52]  + [34] + [52] + pca[:51] // reorder!
  */
+
 void Cylinder::computeFeaturesCols() {
   int i, l;
   switch(mode) {
@@ -461,14 +459,12 @@ void Cylinder::process(Eigen::MatrixXd &scene_normal, std::vector<Eigen::Vector3
 
   // fill cv::Mat full_featMatrix
   for (r=0; r<tot_cells; r++) {
+    // if (grid[r].status == UNPREDICTABLE)
     if (grid[r].label == UNKNOWN_CELL_LABEL)
       continue;
 
     features[r].toVectorTransformed(feat);
 
-    // if (level==1) std::cout << "my: " << (tot_geom_features_across_all_levels + inherited_labels_size)
-                  // << " correct: " << feat.size() << std::endl;
-    // return;
     features_matrix_data_row = full_featMatrix.ptr<float>(valid_rows);
     for (c=0; c<max_feats_num; c++) features_matrix_data_row[c] = feat[re_idx[c]];
       
@@ -520,9 +516,10 @@ void Cylinder::computeAccuracy() {
 void Cylinder::computeFeatures(Eigen::MatrixXd &scene_normal, std::vector<Eigen::Vector3d> &points) {
   bool status;
   for (int r=0; r<(int)features.size(); r++) {
-    if (grid[r].points_idx.size()<2) continue;
-    status = features[r].computeFeatures(&grid[r], scene_normal, points, area[r]);
-    if (!status) grid[r].label=UNKNOWN_CELL_LABEL; 
+    if (grid[r].points_idx.size()>=MIN_NUM_POINTS_IN_CELL) {
+      status = features[r].computeFeatures(&grid[r], scene_normal, points, area[r]);
+      if (status) grid[r].status=PREDICTABLE;
+    }
   }
 }
 
@@ -535,7 +532,7 @@ void Cylinder::storeFeaturesToFile() {
   for (int i=0; i<(int) grid.size(); i++) {
     if (grid[i].label == UNKNOWN_CELL_LABEL) continue;
     features[i].toFile(out);
-    float lab = static_cast< float > (grid[i].label);
+    float lab = static_cast<float> (grid[i].label);
     out.write( reinterpret_cast<const char*>( &(lab) ), sizeof( float ));
   }
   out.close();
@@ -548,7 +545,7 @@ void Cylinder::produceFeaturesRoutine(DataLoader &dl, Cylinder *back_cyl) {
         + std::to_string(level) + std::string(" with nullptr back cylinder.\n"));
   }
   resetGrid();
-  sortBins_cyl(dl.points, dl.distances);
+  sortBins_cyl(dl.points);
   computeTravGT(dl.labels);
   computeFeatures(dl.scene_normal, dl.points);
   if (level>0) inheritGTFeatures(back_cyl);
@@ -559,7 +556,7 @@ void Cylinder::produceFeaturesRoutine(DataLoader &dl, Cylinder *back_cyl) {
 void Cylinder::OnlineRoutine(
                     DataLoader &dl, Cylinder *back_cyl) {
   resetGrid();
-  sortBins_cyl(dl.points, dl.distances);
+  sortBins_cyl(dl.points);
   computeTravGT(dl.labels);
   computeFeatures(dl.scene_normal, dl.points);
   if (level>0) inheritFeatures(back_cyl);
@@ -573,7 +570,7 @@ void Cylinder::OnlineRoutine_Profile(
   resetGrid();
 
   bt.reset();
-  sortBins_cyl(dl.points, dl.distances);
+  sortBins_cyl(dl.points);
   auto e = bt.elapsedTimeMs();
   std::cout << "lv " << level << " - sortbins: " << e << " ms" << std::endl;
 
