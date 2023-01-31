@@ -18,8 +18,8 @@ enum class ExpMode {produce, DL, test};
 #define NOT_TRAV_CELL_LABEL  -1.0f
 #define TRAV_CELL_LABEL  1.0f
 
-#define PREDICTABLE  -1.0f
-#define UNPREDICTABLE  1.0f
+#define PREDICTABLE  1.0f
+#define UNPREDICTABLE  -1.0f
 
 #define MIN_NUM_POINTS_IN_CELL 2
 

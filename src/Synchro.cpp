@@ -194,7 +194,8 @@ void Synchro::createTriangs() {
 
 void Synchro::updateTriang(int level, std::vector<Cell> &grid) {
   Eigen::Vector3d color_;
-  int idx, label, gtlabel;
+  int idx, gtlabel;
+  float label;
   int cont=0;
   int i=0; // TODO:remove dependency on this mechanism. just incremental, better
           // to do so, just create triangs in another order.

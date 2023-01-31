@@ -149,7 +149,7 @@ Cylinder_NuSc::Cylinder_NuSc(YAML::Node &node,  Cylinder *cyl_, ExpMode expmode)
 void Cylinder::inheritFeatures(Cylinder *cyl_) {
   if (max_feats_num == TOT_GEOM_FEATURES) return;
   
-  std::vector<float> prev_feats((TOT_GEOM_FEATURES*(level)) + level - 1);
+  std::vector<float> prev_feats; //((TOT_GEOM_FEATURES*(level)) + level - 1);
   int i, j, c;
   
   for (i=0; i<tot_cells; i++) {
@@ -158,7 +158,7 @@ void Cylinder::inheritFeatures(Cylinder *cyl_) {
     for (j=0; j<prevfeats_num; j++)
       features[i].derived_features[j] = cyl_->features[inherit_idxs[i]].derived_features[j];
 
-    cyl_->features[inherit_idxs[i]].toVectorTransformed(prev_feats);
+    prev_feats = cyl_->features[inherit_idxs[i]].toVectorTransformed();
     for (j=prevfeats_num, c=0; j<prevfeats_num+TOT_GEOM_FEATURES; j++, c++)
       features[i].derived_features[j] = prev_feats[c];
     features[i].derived_features[j] = cyl_->grid[inherit_idxs[i]].predicted_label;
@@ -169,7 +169,7 @@ void Cylinder::inheritFeatures(Cylinder *cyl_) {
 void Cylinder::inheritGTFeatures(Cylinder *cyl_) {
   if (max_feats_num == TOT_GEOM_FEATURES) return;
 
-  std::vector<float> prev_feats(TOT_GEOM_FEATURES + prevfeats_num);
+  std::vector<float> prev_feats; //(TOT_GEOM_FEATURES + prevfeats_num);
   int i, j, c;
 
   for (i=0; i<tot_cells; i++) {
@@ -178,7 +178,7 @@ void Cylinder::inheritGTFeatures(Cylinder *cyl_) {
     for (j=0; j<prevfeats_num; j++)
       features[i].derived_features[j] = cyl_->features[inherit_idxs[i]].derived_features[j];
 
-    cyl_->features[inherit_idxs[i]].toVectorTransformed(prev_feats);
+    prev_feats = cyl_->features[inherit_idxs[i]].toVectorTransformed();
     for (j=prevfeats_num, c=0; j<prevfeats_num+TOT_GEOM_FEATURES; j++, c++)
       features[i].derived_features[j] = prev_feats[c];
     features[i].derived_features[j] = cyl_->grid[inherit_idxs[i]].label;
@@ -226,6 +226,7 @@ void Cylinder_SemKITTI::computeTravGT(std::vector<int> &labels) {
   for (int r=0, valid_rows=0; r<tot_cells; r++) {
     cell = &(grid[r]);
     if (cell->points_idx.size() < MIN_NUM_POINTS_IN_CELL) {
+      cell->label = UNKNOWN_CELL_LABEL;
       continue;
     }
 
@@ -452,7 +453,7 @@ void Cylinder::loadSVM(YAML::Node &node) {
 void Cylinder::process(Eigen::MatrixXd &scene_normal, std::vector<Eigen::Vector3d> &points) {
 
 
-  std::vector<float> feat((TOT_GEOM_FEATURES*(level+1)) + level);
+  std::vector<float> feat;//((TOT_GEOM_FEATURES*(level+1)) + level);
   float *features_matrix_data_row;
   float plab, pred;
   int r, c, valid_rows=0;
@@ -463,7 +464,7 @@ void Cylinder::process(Eigen::MatrixXd &scene_normal, std::vector<Eigen::Vector3
     if (grid[r].label == UNKNOWN_CELL_LABEL)
       continue;
 
-    features[r].toVectorTransformed(feat);
+    feat = features[r].toVectorTransformed();
 
     features_matrix_data_row = full_featMatrix.ptr<float>(valid_rows);
     for (c=0; c<max_feats_num; c++) features_matrix_data_row[c] = feat[re_idx[c]];
@@ -496,7 +497,7 @@ void Cylinder::process(Eigen::MatrixXd &scene_normal, std::vector<Eigen::Vector3
     plab = pred > 0 ? TRAV_CELL_LABEL : NOT_TRAV_CELL_LABEL;
     
     // trick!
-    if (level>0 && featMatrix.at<float>(r, pca_mode+level-1) > 0.5) pred = TRAV_CELL_LABEL;
+    // if (level>0 && featMatrix.at<float>(r, pca_mode+level-1) > 0.5) pred = TRAV_CELL_LABEL;
 
     grid[remap_idxs[r]].predicted_label = plab; // if trick is wanted to be float, put pred
 
