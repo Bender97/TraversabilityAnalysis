@@ -4,7 +4,7 @@
 #define COLOR_UTIL
 
 #include <vector>
-#include <Eigen/Dense>
+#include <eigen3/Eigen/Dense>
 
 struct Color {
   int r, g, b;

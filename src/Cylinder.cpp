@@ -16,6 +16,9 @@ Cylinder::Cylinder(YAML::Node &node) {
 
   tot_cells = steps_num*yaw_steps;
 
+  svm_nu = node["nu"].as<float>();
+  svm_gamma = node["gamma"].as<float>();
+
   grid       = std::vector<Cell>(tot_cells);
   features   = std::vector<Feature>(tot_cells);
   area       = std::vector<float>(tot_cells);
@@ -23,10 +26,6 @@ Cylinder::Cylinder(YAML::Node &node) {
 
   GT_labels_vector = cv::Mat(tot_cells, 1, CV_32FC1);
   predictions_vector = cv::Mat(tot_cells, 1, CV_32F);
-
-  if (!node["dataset"])
-    throw std::runtime_error(
-          std::string("\033[1;31mERROR\033[0m. please set dataset mode.\n") );
   
   tmetric.resetAll();
   gmetric.resetAll();
@@ -56,6 +55,11 @@ Cylinder::Cylinder(YAML::Node &node,  Cylinder *cyl_, ExpMode expmode_) : Cylind
     return;
   }
   
+
+  if (!node["dataset"])
+    throw std::runtime_error(
+          std::string("\033[1;31mERROR\033[0m. please set dataset mode.\n") );
+
   if (node["trick"]) trick_mode = node["trick"].as<int>();
   
   if (node["load_path"]) load_path = sanitize(node["load_path"].as<std::string>());
@@ -333,8 +337,34 @@ void Cylinder::computePredictedLabel(std::vector<int> &labels) {
 
 }
 
-// 17 17 1 17 1 17 1 17 1 17 1
-//       34   52
+/*
+ * 17 17 1 17 1 17 1 17 1 17 1
+ *       34   52
+ * geom               #0 -> [:17]
+ * geom_label         #0 -> /
+ * geom_all           #0 -> /
+ * geom_pca           #0 -> [:17] + pca
+ * geom_pca_label     #0 -> /
+ * geom_pca_all_label #0 -> /
+ *
+ * g  g  g  g  g  g  g  g  g  g  g  g  g  g  g  g  g  L  L  L  L  L  L  L  L  L  L  L  L  L  L  L  L  L  P  G
+ * 0  1  2  3  4  5  6  7  8  9  10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35
+ * geom               #1 -> [:17]
+ * geom_label         #1 -> [:17] + [34]          // reorder
+ * geom_all           #1 -> [:35]         
+ * geom_pca           #1 -> [:17] + pca[:17]
+ * geom_pca_label     #1 -> [:17] + [34] + pca[:17]   // reorder
+ * geom_pca_all_label #1 -> [:35] + pca[:34]
+ *
+ * g  g  g  g  g  g  g  g  g  g  g  g  g  g  g  g  g  L  L  L  L  L  L  L  L  L  L  L  L  L  L  L  L  L  P  L  L  L  L  L  L  L  L  L  L  L  L  L  L  L  L  L  P  G  
+ * 0  1  2  3  4  5  6  7  8  9  10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53
+ * geom               #2 -> [:17]
+ * geom_label         #2 -> [:17] + [34] + [52]   // reorder!
+ * geom_all           #2 -> [:34] + [35:52]  + [34] + [52]   // reorder!
+ * geom_pca           #2 -> [:17] + pca[:17]
+ * geom_pca_label     #2 -> [:17] + [34] + [52] + pca[:17] // reorder
+ * geom_pca_all_label #2 -> [:34] + [35:52]  + [34] + [52] + pca[:51] // reorder!
+ */
 void Cylinder::computeFeaturesCols() {
   int i, l;
   switch(mode) {
@@ -386,13 +416,11 @@ void Cylinder::loadPCAConfigs(YAML::Node &node)
   if (node["pca"]) pca_mode = node["pca"].as<int>();
 
   if (mode>=3) {
-    std::string cname = load_path + "lv" + std::to_string(level) + "/"
-                + modes[mode] + (trick_mode ? "_trick" : "") + "/pca_config_data"
-                + std::to_string(pca_mode) + ".yaml";
+    std::string PCAConfigName = getPCAConfigName(load_path);
     
-    std::cout << "  loading   PCA from " << cname << std::flush;
+    std::cout << "  loading   PCA from " << PCAConfigName << std::flush;
     
-    cv::FileStorage fs(cname, cv::FileStorage::READ);
+    cv::FileStorage fs(PCAConfigName, cv::FileStorage::READ);
     fs["mean"]    >> pca.mean;
     fs["vectors"] >> pca.eigenvectors;
     fs["values"]  >> pca.eigenvalues;
@@ -406,11 +434,7 @@ void Cylinder::loadSVM(YAML::Node &node) {
   
   if (expmode != ExpMode::test) return;
 
-  std::string path = load_path + "lv" + std::to_string(level) + "/"
-      + modes[mode] + (trick_mode ? "_trick" : "") + "/svm_model"
-      + (mode>=3 ? "_" + node["pca"].as<std::string>() : "") + "_" 
-      + node["nu"].as<std::string>() + "_" 
-      + node["gamma"].as<std::string>() + ".bin";
+  std::string path = getSVMName(load_path);
   
   std::cout << "  loading model from " << path << " ... " << std::flush;
 
@@ -419,6 +443,7 @@ void Cylinder::loadSVM(YAML::Node &node) {
         + std::to_string(level) + " has invalid SVM path: " + path + ".\n");
 
   model = cv::ml::SVM::load(path);
+
   if (!model->isTrained())
     throw std::runtime_error("\033[1;31mERROR\033[0m.  level "
         + std::to_string(level) + " has invalid SVM model: it's not trained!");
@@ -489,41 +514,6 @@ void Cylinder::computeAccuracy() {
     gmetric += tmetric;
 }
 
-void Cylinder::filterOutliers() {
-  int cell_idx, newrow, newcol, road_count, non_road_count;
-  int pred_label;
-  int predicted_label_weight = 1;
-  int row;
-  for (int col = 0; col < steps_num; ++col) {
-      for (int rowa = 0; rowa < yaw_steps; ++rowa) {
-          road_count = 0; non_road_count = 0;
-
-          row = (rowa+yaw_steps/2)%yaw_steps;
-
-          for (int o1=-1; o1<2; o1++) {
-              for (int o2=-1; o2<2; o2++) {
-                  if (o1 || o2) { // skip the cell with o1==0 && o2==0 (it's the current cell)
-                      newrow = row + o1; if ( newrow < 0 || newrow >= steps_num ) continue;
-                      newcol = col + o2; if ( newcol < 0 || newcol >= yaw_steps ) continue;
-                      cell_idx = newrow*steps_num + newcol;
-                      pred_label = grid[cell_idx].predicted_label;
-                      if (pred_label==TRAV_CELL_LABEL) road_count++;
-                      else if (pred_label==NOT_TRAV_CELL_LABEL) non_road_count++;
-                  }
-              }
-          }
-          cell_idx = row*steps_num + col;
-
-          if ( grid[cell_idx].predicted_label < 2 ) {
-              if (grid[cell_idx].predicted_label == TRAV_CELL_LABEL) road_count += predicted_label_weight;
-              else non_road_count += predicted_label_weight;
-              grid[cell_idx].predicted_label = (road_count > non_road_count ? TRAV_CELL_LABEL : NOT_TRAV_CELL_LABEL);
-          }
-      }
-  }
-}
-
-
 void Cylinder::computeFeatures(Eigen::MatrixXd &scene_normal, std::vector<Eigen::Vector3d> &points) {
   bool status;
   for (int r=0; r<(int)features.size(); r++) {
@@ -573,4 +563,27 @@ void Cylinder::OnlineRoutine(
   if (level>0) inheritGTFeatures(back_cyl);
   process(dl.scene_normal, dl.points);
   computeAccuracy();
+}
+
+std::string Cylinder::getSVMName(std::string prefix) {
+  return prefix + "lv" + std::to_string(level) + "/"
+    + modes[mode] + (trick_mode ? "_trick" : "") + "/svm_model"
+    + (mode>=3 ? "_" + std::to_string(pca_mode) : "") + "_" 
+    + cleanFloatStr(svm_nu) + "_" 
+    + cleanFloatStr(svm_gamma) + ".bin";
+}
+std::string Cylinder::getPCAConfigName(std::string prefix) {
+  return prefix + "lv" + std::to_string(level) + "/"
+    + modes[mode] + (trick_mode ? "_trick" : "") + "/pca_config_data"
+    + std::to_string(pca_mode) + ".yaml";
+}
+std::string Cylinder::getNormalizerConfigName(std::string prefix) {
+  return prefix + "pca_config_data" + std::to_string(pca_mode) + ".yaml";
+}
+std::string Cylinder::getYAMLMetricsName() {
+  return save_path + "lv" + std::to_string(level) + "/"
+    + modes[mode] + (trick_mode ? "_trick" : "") + "/"
+    + (mode>=3 ? "_" + std::to_string(pca_mode) : "") + "_" 
+    + cleanFloatStr(svm_nu) + "_" 
+    + cleanFloatStr(svm_gamma) + ".yaml";
 }

@@ -65,21 +65,16 @@ ADD_LIBRARY(normalizer
 target_link_libraries(normalizer yaml-cpp ${OpenCV_LIBS})
 
 
-# ADD_LIBRARY(traindataset
-# 	include/TrainDataset.h src/TrainDataset.cpp
-# )
-# target_link_libraries(traindataset feature normalizer metric yaml-cpp ${OpenCV_LIBS})
-
-
-# ADD_LIBRARY(CylinderConfiguration
-# 	include/PcaMode.h src/PcaMode.cpp
-# )
-# target_link_libraries(CylinderConfiguration yaml-cpp)
-
 ADD_LIBRARY(cylinder
 	include/Cylinder.h src/Cylinder.cpp
 )
 target_link_libraries(cylinder ${OpenCV_LIBS} normalizer feature metric dataloader yaml-cpp)
+
+
+ADD_LIBRARY(traindataset
+	include/TrainDataset.h src/TrainDataset.cpp
+)
+target_link_libraries(traindataset yaml-cpp ${OpenCV_LIBS} feature normalizer metric cylinder )
 
 SET (custom_libs cylinder feature normalizer color_util yaml-cpp metric results dataloader synchro)
 
@@ -87,12 +82,12 @@ SET (custom_libs cylinder feature normalizer color_util yaml-cpp metric results 
 
 # Produce Feature
 add_executable(mtmain src/mtmain.cpp)
-target_link_libraries(mtmain ${Boost_LIBRARIES} ${Boost_FILESYSTEM_LIBRARY} ${custom_libs} ${OpenCV_LIBS} )
-# #
-# # Train
-# add_executable(train src/train.cpp)
-# target_link_libraries(train ${Boost_LIBRARIES} ${Boost_FILESYSTEM_LIBRARY} ${custom_libs} ${OpenCV_LIBS} )
-# # Test
+target_link_libraries(mtmain ${custom_libs} ${OpenCV_LIBS} )
+#
+# Train
+add_executable(train src/train.cpp)
+target_link_libraries(train ${custom_libs} traindataset ${OpenCV_LIBS} )
+# Test
 add_executable(test src/try_cyl.cpp)
 target_link_libraries(test  ${custom_libs})
 

@@ -3,7 +3,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
-#include <Eigen/Dense>
+#include <eigen3/Eigen/Dense>
 #include "Cell.h"
 #include "common_macro.hpp"
 

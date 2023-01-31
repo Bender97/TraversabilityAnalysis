@@ -36,6 +36,22 @@ inline std::string sanitize(std::string path) {
   return path + "/";
 }
 
+inline std::string cleanFloatStr(float x) {
+  std::string str = std::to_string(x);
+  // Ensure that there is a decimal point somewhere (there should be)
+  if(str.find('.') != std::string::npos)
+  {
+      // Remove trailing zeroes
+      str = str.substr(0, str.find_last_not_of('0')+1);
+      // If the decimal point is now the last character, remove that as well
+      if(str.find('.') == str.size()-1)
+      {
+          str = str.substr(0, str.size()-1);
+      }
+  }
+  return str;
+}
+
 class Cylinder {
 public:
   float start_radius;   // [m]
@@ -78,6 +94,8 @@ public:
   int max_feats_num, tot_geom_features_across_all_levels;
   int mode, pca_mode, trick_mode;
 
+  float svm_nu, svm_gamma;
+
   Cylinder(YAML::Node &node);
   Cylinder(YAML::Node &node, Cylinder *cyl_, ExpMode expmode);
   
@@ -101,7 +119,6 @@ public:
   void loadSVM(YAML::Node &node);
   void process(Eigen::MatrixXd &scene_normal, std::vector<Eigen::Vector3d> &points);
   void computeAccuracy();
-  void filterOutliers();
 
   void storeFeaturesToFile();
 
@@ -111,6 +128,10 @@ public:
   void produceFeaturesRoutine(DataLoader &dl, Cylinder *back_cyl);
   void OnlineRoutine(DataLoader &dl, Cylinder *cyl_);
 
+  std::string getSVMName(std::string prefix);
+  std::string getPCAConfigName(std::string prefix);
+  std::string getNormalizerConfigName(std::string prefix);
+  std::string getYAMLMetricsName();
 
 };
 

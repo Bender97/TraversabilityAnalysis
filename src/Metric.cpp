@@ -62,19 +62,8 @@ std::string Metric::getresults() const {
   return ss.str();
 }
 
-void Metric::toYaml(float nu, float gamma, float C, int pca, int rows, int tot_cells, std::string folderpath) {
-  std::string filename = folderpath + std::string("/");
-  if (pca>=0) filename += std::to_string(pca) + std::string("_");
-
-  std::string nu_s = std::to_string(nu);
-  nu_s.erase ( nu_s.find_last_not_of('0') + 1, std::string::npos );
-  nu_s.erase ( nu_s.find_last_not_of('.') + 1, std::string::npos );
-
-  std::string gamma_s = std::to_string(gamma);
-  gamma_s.erase ( gamma_s.find_last_not_of('0') + 1, std::string::npos );
-  gamma_s.erase ( gamma_s.find_last_not_of('.') + 1, std::string::npos );
-  filename += nu_s + std::string("_") + gamma_s + std::string(".yaml");
-  
+void Metric::toYaml(float nu, float gamma, float C, int pca, int rows, int tot_cells, std::string filename) {
+    
   std::ofstream out(filename.c_str());
 
   YAML::Emitter outyaml(out);

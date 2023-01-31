@@ -9,7 +9,7 @@
 #include <vector>
 #include <sys/types.h>
 #include <dirent.h>
-#include <Eigen/Dense>
+#include <eigen3/Eigen/Dense>
 #include "yaml-cpp/yaml.h"
 #include "ColorUtil.h"
 #include "common_macro.hpp"

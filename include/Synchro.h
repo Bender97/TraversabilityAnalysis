@@ -6,7 +6,7 @@
 #include <thread>
 // #include <mutex>
 #include <queue>
-#include <Eigen/Dense>
+#include <eigen3/Eigen/Dense>
 #include "open3d/Open3D.h"
 #include "yaml-cpp/yaml.h"
 
