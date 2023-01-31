@@ -22,8 +22,6 @@
 
 class TrainDataset : public Cylinder {
 public:
-  std::string filename, save_path, load_path;
-
   cv::Mat X_train, y_train;
 
   int num_entries_to_train_on;

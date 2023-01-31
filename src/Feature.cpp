@@ -91,6 +91,30 @@ std::vector<float> Feature::toVectorTransformed() {
   return feature;
 }
 
+void Feature::toVectorTransformed(std::vector<float> &feature) {
+  feature[0] = linearity;
+  feature[1] = planarity;
+  feature[2] = sphericity;
+  feature[3] = omnivariance;
+  feature[4] = anisotropy;
+  feature[5] = eigenentropy;
+  feature[6] = sum_of_eigenvalues;
+  feature[7] = curvature;
+  feature[8] = angle;
+  feature[9] = goodness_of_fit;
+  feature[10] = roughness;
+  feature[11] = nvx;
+  feature[12] = nvy;
+  feature[13] = nvz;
+  feature[14] = unevenness;
+  feature[15] = surface_density;
+  feature[16] = z_diff;
+  for (int i=0; i<(int)derived_features.size(); i++)
+    feature[TOT_GEOM_FEATURES+i] = derived_features[i];
+  for (int i=0; i<TOT_GEOM_FEATURES; i++) // TOT_GEOM_FEATURES because derived feature are already transformed
+    feature[i] = log( abs(feature[i]) + 1e-4 );
+}
+
 void Feature::toFile(std::ofstream &out) {
   out.write( reinterpret_cast<const char*>( &(linearity) ), sizeof( float ));
   out.write( reinterpret_cast<const char*>( &(planarity) ), sizeof( float ));

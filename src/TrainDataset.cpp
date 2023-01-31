@@ -5,6 +5,7 @@ TrainDataset::TrainDataset(YAML::Node &node_cyl, int level_, bool train_flag)
 {
   
   init(node_cyl, level_);
+  computeFeaturesCols();
   load();
 }
 
@@ -15,11 +16,12 @@ TrainDataset::TrainDataset(YAML::Node &node_cyl, int level_, Normalizer &normali
   pca = pca_;
 
   init(node_cyl, level_, false);
+  computeFeaturesCols();
   load();
 }
 
 void TrainDataset::init(YAML::Node &node_cyl, int level_, bool train_flag) {
-  filename = node_cyl["store_features_filename"].as<std::string>();
+  store_features_filename = node_cyl["store_features_filename"].as<std::string>();
 
   YAML::Node node_mode;
   if (!train_flag) node_mode = node_cyl["valid"];
@@ -30,8 +32,6 @@ void TrainDataset::init(YAML::Node &node_cyl, int level_, bool train_flag) {
     gamma_vec = node_mode["gamma_vec"].as<std::vector<float>>();  
   }
 
-             
-  
   num_entries_to_train_on = node_mode["feats_to_sample"].as<int>();
   need_to_balance_flag = node_mode["balance_flag"].as<bool>();
   level = level_;
@@ -40,7 +40,7 @@ void TrainDataset::init(YAML::Node &node_cyl, int level_, bool train_flag) {
   save_path = sanitize(node_cyl["save_path"].as<std::string>());
   load_path = sanitize(node_cyl["load_path"].as<std::string>());
 
-  filename = load_path + (!train_flag ? "val_" : "") + filename + std::to_string(level_) + ".bin";
+  store_features_filename = load_path + (!train_flag ? "val_" : "") + store_features_filename + std::to_string(level_) + ".bin";
 
   std::cout << "train level: " << level << "  " << std::flush;
 
@@ -54,17 +54,13 @@ void TrainDataset::init(YAML::Node &node_cyl, int level_, bool train_flag) {
   if (node_cyl["pca"])       pca_mode = node_cyl["pca"].as<int>();
   else std::cout << "NO PCA MODE FOUND!" << std::endl;
   std::cout << "pca_mode " << pca_mode << std::endl;
-
-  computeFeaturesCols();
-
 }
-
 
 void TrainDataset::readLabels() {
   Feature feature;
   float label;
   int pos = 0;
-  std::ifstream in(filename.c_str(), std::ios::in | std::ios::binary);
+  std::ifstream in(store_features_filename.c_str(), std::ios::in | std::ios::binary);
   if (level>0 && trick_mode) {
     while(true) {
         if (!feature.ignoreFeatureFromFile(in, inherited_labels_size)) break;
@@ -88,9 +84,6 @@ void TrainDataset::readLabels() {
   }
 
   std::cout << " read Labels: found: " << pos << " samples\n";
-  // read data from file
-  // std::ifstream in(filename.c_str(), std::ios::in | std::ios::binary);
-  //in.seekg(0, std::ios::beg);
   in.close();
 }
 
@@ -101,7 +94,7 @@ void TrainDataset::loadData() {
   float *features_matrix_data_row;
   int pos=0, row, c;
 
-  std::ifstream feat_file(filename.c_str(), std::ios::in | std::ios::binary);
+  std::ifstream feat_file(store_features_filename.c_str(), std::ios::in | std::ios::binary);
 
   for (row=0; row<tot_samples_found && pos<num_entries_to_train_on; row++) {
     if (row<sampled_idxs[pos]) {
@@ -151,13 +144,13 @@ void TrainDataset::sampleIdxs() {
 
 void TrainDataset::load() {
 
-  std::cout << "loading file \033[1;33m" << filename << "\033[0m" << std::flush;
+  std::cout << "loading file \033[1;33m" << store_features_filename << "\033[0m" << std::flush;
   
   cont_trav=0; cont_nontrav=0;
   inherited_labels_size = (1+TOT_GEOM_FEATURES)*level;  // derived features size of the produced features file
   tot_samples_found=0;
   
-  std::ifstream in(filename.c_str(), std::ios::binary | std::ios::ate);
+  std::ifstream in(store_features_filename.c_str(), std::ios::binary | std::ios::ate);
   tot_samples_found = in.tellg() / (sizeof(float)*(TOT_GEOM_FEATURES + inherited_labels_size+1));
   std::cout << " found: " << tot_samples_found << " samples\n";
 
@@ -246,8 +239,7 @@ void TrainDataset::load() {
 }
 
 void TrainDataset::summary() {
-  std::stringstream ss("    ");
-  std::cout << "    " << filename +" using " + std::to_string(num_entries_to_train_on) + " samples."
+  std::cout << "    " << store_features_filename +" using " + std::to_string(num_entries_to_train_on) + " samples."
              << " Balance? " << need_to_balance_flag
              << " at level: "  << level
              << " nu size: " << nu_vec.size()
@@ -255,7 +247,6 @@ void TrainDataset::summary() {
              << " train mode: " << modes[mode]
              << " pca mode: " << pca_mode
              << std::endl;
-  //return ss.str(  );
 }
 
 void TrainDataset::checkFileAndConfigAreValid(int feats_size, int tot_entries, int cont_trav, int cont_nontrav) {

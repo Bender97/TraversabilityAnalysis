@@ -15,6 +15,7 @@
 #include "Feature.h"
 #include "common_macro.hpp"
 #include "Metric.h"
+#include "cv_ext.h"
 #include "yaml-cpp/yaml.h"
 
 #include <opencv2/core.hpp>
@@ -83,7 +84,7 @@ public:
 
   double M_DOUBLE_PI = M_PI*2.0;
 
-  std::string store_features_ofname;
+  std::string store_features_filename;
 
   std::vector<int> inherit_idxs;
   int prevfeats_num;
@@ -105,7 +106,7 @@ public:
 
   void loadPCAConfigs(YAML::Node &node);
 
-  void sortBins_cyl(std::vector<Eigen::Vector3d> &points);
+  void sortBins_cyl(std::vector<Eigen::Vector3d> &points, std::vector<float> &distances);
 
   void resetGrid();
 
@@ -127,6 +128,7 @@ public:
 
   void produceFeaturesRoutine(DataLoader &dl, Cylinder *back_cyl);
   void OnlineRoutine(DataLoader &dl, Cylinder *cyl_);
+  void OnlineRoutine_Profile(DataLoader &dl, Cylinder *cyl_);
 
   std::string getSVMName(std::string prefix);
   std::string getPCAConfigName(std::string prefix);

@@ -27,6 +27,7 @@ public:
   std::vector<Eigen::Vector3d> points;
   std::vector<int> labels;
   Eigen::MatrixXd scene_normal;
+  std::vector<float> distances;
 
   open3d::geometry::PointCloud pc;
   std::shared_ptr<open3d::geometry::VoxelGrid> voxel;

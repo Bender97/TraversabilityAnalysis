@@ -44,6 +44,7 @@ class Feature {
     std::vector<float> toVector();
 
     std::vector<float> toVectorTransformed();
+    void toVectorTransformed(std::vector<float> &feature);
 
     void toFile(std::ofstream &out);
 

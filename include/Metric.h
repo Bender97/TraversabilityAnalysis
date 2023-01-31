@@ -26,7 +26,7 @@ public:
   void resetAll();
   void checkpointTime();
 
-  void toYaml(float nu, float gamma, float C, int pca, int row, int tot_cells, std::string folderpath);
+  void log2YAML(float nu, float gamma, float C, int pca, int row, int tot_cells, std::string folderpath);
 
   void print(const char *msg, int tot_cells=1, int tot_workers=1) const;
   void printLight(const char *msg, int tot_cells=1, int tot_workers=1) const;

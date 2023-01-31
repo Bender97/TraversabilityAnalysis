@@ -104,7 +104,7 @@ void produceFeatures(int thread_idx, int start, int end) {
   mu2.lock();
   loadCyls(cyls, sample_data);
   mu2.unlock();
-  for (auto &cyl: cyls) cyl->store_features_ofname += std::string("_") + std::to_string(thread_idx);
+  for (auto &cyl: cyls) cyl->store_features_filename += std::string("_") + std::to_string(thread_idx);
   
   DataLoader_SemKITTI dl;
   int tot = end - start;
@@ -195,10 +195,10 @@ int main (int argc, char** argv) {
     std::string  rm_cmd = "rm ";
       
     for (int thread_idx=0; thread_idx<tot_pools; thread_idx++) {
-      cat_cmd += std::string(" ") + cyls[i]->store_features_ofname + std::string("_") + std::to_string(thread_idx);
-       rm_cmd += std::string(" ") + cyls[i]->store_features_ofname + std::string("_") + std::to_string(thread_idx);
+      cat_cmd += std::string(" ") + cyls[i]->store_features_filename + std::string("_") + std::to_string(thread_idx);
+       rm_cmd += std::string(" ") + cyls[i]->store_features_filename + std::string("_") + std::to_string(thread_idx);
     }
-    cat_cmd += std::string(" > ") + cyls[i]->store_features_ofname;
+    cat_cmd += std::string(" > ") + cyls[i]->store_features_filename;
 
     // execute cat (merge all temp file into one)
     fp = popen(cat_cmd.c_str(), "r");

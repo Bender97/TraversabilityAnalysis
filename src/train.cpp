@@ -144,19 +144,25 @@ int main (int argc, char** argv)
   if (train_duration_secs<0) train_duration_secs = 10000;
 
   std::vector<Results> results;
+  cv::Mat predictions_vector;
+  Metric tmetric, vmetric;
+  TrainDataset *td, *vd;
+  float C = 1.0f;
 
   for (size_t i=0; i<train_datasets.size(); i++) {
 
-    float C = 1.0f;
+    td = &(train_datasets[i]);
+    vd = &(val_datasets[i]);
 
-    cv::Mat predictions_vector;
+    for (auto &nu: td->nu_vec) {
+      for (auto &gamma: td->gamma_vec) {
 
-    for (auto &nu: train_datasets[i].nu_vec) {
-      for (auto &gamma: train_datasets[i].gamma_vec) {
+        std::cout << " ##############################      ###########################" << std::endl
+                  << " training " << td->X_train.rows << " rows " << td->X_train.cols << " cols"
+                  << " max_iter: " << max_iter << "  ##  nu: " << nu 
+                  << " C: " << C << " gamma: " << gamma << std::endl;
 
-        std::cout << " ##############################      ###########################" << std::endl;
-        std::cout << " training " << train_datasets[i].X_train.rows << " rows " << train_datasets[i].X_train.cols << " cols max_iter: " << max_iter << "  ##  nu: " << nu << " C: " << C << " gamma: " << gamma << std::endl;
-
+        // TRAIN MODEL: SET PARAMS
         cv::Ptr<cv::ml::SVM> local_model;
         local_model.reset();
         local_model = cv::ml::SVM::create();
@@ -164,49 +170,41 @@ int main (int argc, char** argv)
         local_model->setKernel(cv::ml::SVM::RBF);
         local_model->setNu(nu);
         local_model->setGamma(gamma);
-        local_model->setC(1.0f);
+        local_model->setC(C);
         local_model->setTermCriteria(cv::TermCriteria(cv::TermCriteria::MAX_ITER, max_iter, 1e-6));
 
-        local_model->train(train_datasets[i].X_train, cv::ml::ROW_SAMPLE, train_datasets[i].y_train);
+        // TRAIN
+        local_model->train(td->X_train, cv::ml::ROW_SAMPLE, td->y_train);
 
-        std::cout << "trained? " << local_model->isTrained() << std::endl;
-
-        Metric tmetric;
-        predictions_vector = cv::Mat::zeros(train_datasets[i].y_train.rows, 1, CV_32F); 
+        // TRAIN ERROR        
+        predictions_vector = cv::Mat::zeros(td->y_train.rows, 1, CV_32F); 
         tmetric.resetAll();
-        local_model->predict(train_datasets[i].X_train, predictions_vector, cv::ml::StatModel::RAW_OUTPUT);
+        local_model->predict(td->X_train, predictions_vector, cv::ml::StatModel::RAW_OUTPUT);
         tmetric.checkpointTime();
-        computeAcc(&(train_datasets[i]), predictions_vector, tmetric, "train: ");
+        computeAcc(td, predictions_vector, tmetric, "train: ");
 
-        Metric vmetric;
-        predictions_vector = cv::Mat::zeros(val_datasets[i].y_train.rows, 1, CV_32F);
+        // VALID ERROR
+        predictions_vector = cv::Mat::zeros(vd->y_train.rows, 1, CV_32F);
         vmetric.resetAll();
-        local_model->predict(val_datasets[i].X_train, predictions_vector, cv::ml::StatModel::RAW_OUTPUT);
+        local_model->predict(vd->X_train, predictions_vector, cv::ml::StatModel::RAW_OUTPUT);
         vmetric.checkpointTime();
-        computeAcc(&(val_datasets[i]), predictions_vector, vmetric, "valid: ");
+        computeAcc(vd, predictions_vector, vmetric, "valid: ");
 
-
-        std::string nu_s = std::to_string(nu);
-        nu_s.erase ( nu_s.find_last_not_of('0') + 1, std::string::npos );
-        nu_s.erase ( nu_s.find_last_not_of('.') + 1, std::string::npos );
-
-        std::string gamma_s = std::to_string(gamma);
-        gamma_s.erase ( gamma_s.find_last_not_of('0') + 1, std::string::npos );
-        gamma_s.erase ( gamma_s.find_last_not_of('.') + 1, std::string::npos );
-
-        std::string model_file_name_ = train_datasets[i].getSVMName(train_datasets[i].save_path);
+        std::string model_file_name_ = td->getSVMName(td->save_path);
         local_model->save(model_file_name_);
-        //svm_save_model(model_file_name_.c_str(), model);
-        std::cout << "svm model stored at " << model_file_name_ << std::endl << std::endl;
 
         results.push_back(Results(nu, C, gamma, tmetric, vmetric));
 
-        //log
-        vmetric.toYaml(nu, gamma, C, pca_mode, val_datasets[i].X_train.rows, val_datasets[i].tot_cells, train_datasets[i].getYAMLMetricsName());
+        //LOG
+        vmetric.log2YAML(nu, gamma, C, pca_mode, 
+                        vd->X_train.rows, vd->tot_cells, 
+                        td->getYAMLMetricsName());
 
       }
     }
   }
+
+  // PRINT results sorted (top to bottom: best to worse)
 
   std::sort(results.begin(), results.end()/*, std::greater<Results>()*/);
 

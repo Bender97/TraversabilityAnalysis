@@ -17,9 +17,9 @@ float Metric::avgFN() const {return fn/(float)(tp+tn+fp+fn);}
 float Metric::acc() const {return (tp+tn)/(float)(tp+tn+fp+fn);}
 
 void Metric::print(const char *msg, int tot_cells, int tot_workers) const {
-  float iou, f1;
-  iou = (float)tp / (tp+fn+fp);
-  f1 = 2.0f*tp / (2*tp+fn+fp);
+  // float iou, f1;
+  // iou = (float)tp / (tp+fn+fp);
+  // f1 = 2.0f*tp / (2*tp+fn+fp);
 
   std::cout << std::setw(12) << "\033[1;31m" << msg << "\033[0m" << std::endl;
   std::cout << "         TP:" << std::setw(8) << std::setprecision(4) << avgTP();
@@ -29,19 +29,21 @@ void Metric::print(const char *msg, int tot_cells, int tot_workers) const {
   std::cout << "        acc: \033[1;32m" << std::setw(8) << std::setprecision(4) << acc() << "\033[0m";
   std::cout << " lat: \033[1;35m" << std::setw(5) << (checkpointTime_ ) << "\033[0m ms";
   std::cout << " lat: \033[1;35m" << std::setw(5) << (checkpointTime_  * tot_cells / tot) << "\033[0m ms";
+  std::cout << std::endl;
 
-  std::cout << std::endl << std::endl;
-  std::cout << "& mode & pca & "
-            << std::setw(5)<< std::setprecision(4) << acc()*100.0f << " & "
-            << std::setw(5)<< std::setprecision(4) << iou*100.0f << " & "
-            << std::setw(5)<< std::setprecision(4) << f1*100.0f << " & "
-            << std::setw(5)<< std::setprecision(4) << avgFP()*100.0f << " & "
-            << std::setw(5)<< std::setprecision(4) << avgTP()*100.0f << " & "
-            << std::setw(5)<< std::setprecision(4) << avgFN()*100.0f << " & "
-            << std::setw(5)<< std::setprecision(4) << avgTN()*100.0f << std::endl;
+  // latex
+  // std::cout << std::endl << std::endl;
+  // std::cout << "& mode & pca & "
+  //           << std::setw(5)<< std::setprecision(4) << acc()*100.0f << " & "
+  //           << std::setw(5)<< std::setprecision(4) << iou*100.0f << " & "
+  //           << std::setw(5)<< std::setprecision(4) << f1*100.0f << " & "
+  //           << std::setw(5)<< std::setprecision(4) << avgFP()*100.0f << " & "
+  //           << std::setw(5)<< std::setprecision(4) << avgTP()*100.0f << " & "
+  //           << std::setw(5)<< std::setprecision(4) << avgFN()*100.0f << " & "
+  //           << std::setw(5)<< std::setprecision(4) << avgTN()*100.0f << std::endl;
 
 
-  std::cout << std::endl << std::endl;
+  // std::cout << std::endl << std::endl;
 }
 
 void Metric::printLight(const char *msg, int tot_cells, int tot_workers) const {
@@ -62,7 +64,7 @@ std::string Metric::getresults() const {
   return ss.str();
 }
 
-void Metric::toYaml(float nu, float gamma, float C, int pca, int rows, int tot_cells, std::string filename) {
+void Metric::log2YAML(float nu, float gamma, float C, int pca, int rows, int tot_cells, std::string filename) {
     
   std::ofstream out(filename.c_str());
 

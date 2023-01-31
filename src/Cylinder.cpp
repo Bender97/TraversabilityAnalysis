@@ -90,11 +90,11 @@ Cylinder::Cylinder(YAML::Node &node,  Cylinder *cyl_, ExpMode expmode_) : Cylind
     if (node["store_features_filename"]) ofname = node["store_features_filename"].as<std::string>();
     else throw std::runtime_error(std::string("\033[1;31mERROR\033[0m. Please provide a valid outfile name. Found empty!\n"));
 
-    store_features_ofname = sanitize(save_path) + ofname + std::to_string(level) + ".bin";
+    store_features_filename = sanitize(save_path) + ofname + std::to_string(level) + ".bin";
     
-    if (store_features_ofname.empty()) 
+    if (store_features_filename.empty()) 
       throw std::runtime_error(std::string("\033[1;31mERROR\033[0m. Please provide a valid outfile path. Found empty!\n"));
-    std::ofstream out(store_features_ofname.c_str(), std::ios::out | std::ios::binary);
+    std::ofstream out(store_features_filename.c_str(), std::ios::out | std::ios::binary);
     out.close();
   } 
   // pre-compute the index from which to inherit features
@@ -149,7 +149,7 @@ Cylinder_NuSc::Cylinder_NuSc(YAML::Node &node,  Cylinder *cyl_, ExpMode expmode)
 void Cylinder::inheritFeatures(Cylinder *cyl_) {
   if (max_feats_num == TOT_GEOM_FEATURES) return;
   
-  std::vector<float> prev_feats;
+  std::vector<float> prev_feats((TOT_GEOM_FEATURES*(level)) + level - 1);
   int i, j, c;
   
   for (i=0; i<tot_cells; i++) {
@@ -158,7 +158,7 @@ void Cylinder::inheritFeatures(Cylinder *cyl_) {
     for (j=0; j<prevfeats_num; j++)
       features[i].derived_features[j] = cyl_->features[inherit_idxs[i]].derived_features[j];
 
-    prev_feats = cyl_->features[inherit_idxs[i]].toVectorTransformed();
+    cyl_->features[inherit_idxs[i]].toVectorTransformed(prev_feats);
     for (j=prevfeats_num, c=0; j<prevfeats_num+TOT_GEOM_FEATURES; j++, c++)
       features[i].derived_features[j] = prev_feats[c];
     features[i].derived_features[j] = cyl_->grid[inherit_idxs[i]].predicted_label;
@@ -169,7 +169,7 @@ void Cylinder::inheritFeatures(Cylinder *cyl_) {
 void Cylinder::inheritGTFeatures(Cylinder *cyl_) {
   if (max_feats_num == TOT_GEOM_FEATURES) return;
 
-  std::vector<float> prev_feats;
+  std::vector<float> prev_feats(TOT_GEOM_FEATURES + prevfeats_num);
   int i, j, c;
 
   for (i=0; i<tot_cells; i++) {
@@ -178,7 +178,7 @@ void Cylinder::inheritGTFeatures(Cylinder *cyl_) {
     for (j=0; j<prevfeats_num; j++)
       features[i].derived_features[j] = cyl_->features[inherit_idxs[i]].derived_features[j];
 
-    prev_feats = cyl_->features[inherit_idxs[i]].toVectorTransformed();
+    cyl_->features[inherit_idxs[i]].toVectorTransformed(prev_feats);
     for (j=prevfeats_num, c=0; j<prevfeats_num+TOT_GEOM_FEATURES; j++, c++)
       features[i].derived_features[j] = prev_feats[c];
     features[i].derived_features[j] = cyl_->grid[inherit_idxs[i]].label;
@@ -186,19 +186,18 @@ void Cylinder::inheritGTFeatures(Cylinder *cyl_) {
   
 }
 
-void Cylinder::sortBins_cyl(std::vector<Eigen::Vector3d> &points) {
+void Cylinder::sortBins_cyl(std::vector<Eigen::Vector3d> &points, std::vector<float> &distances) {
   int row, col, ps;
   float radius, yaw;
   Eigen::Vector3d *p;
   
   ps = (int) points.size();
   for (int i=0; i<ps; ++i) {
-    
     p = &(points[i]);
     radius = p->norm();
     if (radius >= end_radius || radius<=start_radius) continue;
 
-    // assumption: no x=y=0 since it's the laser origin..
+    // assumption: no x=y=0 since it's the laser origin
     yaw = std::atan2((*p)(0), (*p)(1)) + M_PI;
 
     row = int_floor(yaw / yaw_res);
@@ -455,7 +454,7 @@ void Cylinder::loadSVM(YAML::Node &node) {
 void Cylinder::process(Eigen::MatrixXd &scene_normal, std::vector<Eigen::Vector3d> &points) {
 
 
-  std::vector<float> feat;
+  std::vector<float> feat((TOT_GEOM_FEATURES*(level+1)) + level);
   float *features_matrix_data_row;
   float plab, pred;
   int r, c, valid_rows=0;
@@ -465,7 +464,11 @@ void Cylinder::process(Eigen::MatrixXd &scene_normal, std::vector<Eigen::Vector3
     if (grid[r].label == UNKNOWN_CELL_LABEL)
       continue;
 
-    feat = features[r].toVectorTransformed();
+    features[r].toVectorTransformed(feat);
+
+    // if (level==1) std::cout << "my: " << (tot_geom_features_across_all_levels + inherited_labels_size)
+                  // << " correct: " << feat.size() << std::endl;
+    // return;
     features_matrix_data_row = full_featMatrix.ptr<float>(valid_rows);
     for (c=0; c<max_feats_num; c++) features_matrix_data_row[c] = feat[re_idx[c]];
       
@@ -524,18 +527,17 @@ void Cylinder::computeFeatures(Eigen::MatrixXd &scene_normal, std::vector<Eigen:
 }
 
 void Cylinder::storeFeaturesToFile() {
-  std::ofstream out(store_features_ofname.c_str(), std::ios::binary);
-  if (!out) // didn't open, do some error reporting here
-      std::cout << "OUTSTREAM opening error - " << store_features_ofname << std::endl;
-  //int cont=0;
+  std::ofstream out(store_features_filename.c_str(), std::ios::binary);
+  if (!out) 
+      throw std::runtime_error("\033[1;31mERROR\033[0m.  OUTSTREAM opening  "
+        + store_features_filename);
+  
   for (int i=0; i<(int) grid.size(); i++) {
     if (grid[i].label == UNKNOWN_CELL_LABEL) continue;
-    //cont++;
     features[i].toFile(out);
     float lab = static_cast< float > (grid[i].label);
     out.write( reinterpret_cast<const char*>( &(lab) ), sizeof( float ));
   }
-  //std::cout << "written " << cont << std::endl;
   out.close();
 }
 
@@ -546,7 +548,7 @@ void Cylinder::produceFeaturesRoutine(DataLoader &dl, Cylinder *back_cyl) {
         + std::to_string(level) + std::string(" with nullptr back cylinder.\n"));
   }
   resetGrid();
-  sortBins_cyl(dl.points);
+  sortBins_cyl(dl.points, dl.distances);
   computeTravGT(dl.labels);
   computeFeatures(dl.scene_normal, dl.points);
   if (level>0) inheritGTFeatures(back_cyl);
@@ -557,12 +559,52 @@ void Cylinder::produceFeaturesRoutine(DataLoader &dl, Cylinder *back_cyl) {
 void Cylinder::OnlineRoutine(
                     DataLoader &dl, Cylinder *back_cyl) {
   resetGrid();
-  sortBins_cyl(dl.points);
+  sortBins_cyl(dl.points, dl.distances);
   computeTravGT(dl.labels);
   computeFeatures(dl.scene_normal, dl.points);
-  if (level>0) inheritGTFeatures(back_cyl);
+  if (level>0) inheritFeatures(back_cyl);
   process(dl.scene_normal, dl.points);
   computeAccuracy();
+}
+
+void Cylinder::OnlineRoutine_Profile(
+                    DataLoader &dl, Cylinder *back_cyl) {
+  cv_ext::BasicTimer bt;                      
+  resetGrid();
+
+  bt.reset();
+  sortBins_cyl(dl.points, dl.distances);
+  auto e = bt.elapsedTimeMs();
+  std::cout << "lv " << level << " - sortbins: " << e << " ms" << std::endl;
+
+  bt.reset();
+  computeTravGT(dl.labels);
+  e = bt.elapsedTimeMs();
+  std::cout << "lv " << level << " - computeTravGT: " << e << " ms" << std::endl;
+
+  bt.reset();
+  computeFeatures(dl.scene_normal, dl.points);
+  e = bt.elapsedTimeMs();
+  std::cout << "lv " << level << " - computeFeatures: " << e << " ms" << std::endl;
+  
+  if (level>0) {
+    bt.reset();
+    inheritFeatures(back_cyl);
+    e = bt.elapsedTimeMs();
+    std::cout << "lv " << level << " - inheritFeatures: " << e << " ms" << std::endl;
+  }
+
+  bt.reset();
+  process(dl.scene_normal, dl.points);
+  e = bt.elapsedTimeMs();
+  std::cout << "lv " << level << " - process: " << e << " ms" << std::endl;
+  
+  bt.reset();
+  computeAccuracy();
+  e = bt.elapsedTimeMs();
+  std::cout << "lv " << level << " - computeAccuracy: " << e << " ms" << std::endl;
+
+  std::cout << std::endl;
 }
 
 std::string Cylinder::getSVMName(std::string prefix) {

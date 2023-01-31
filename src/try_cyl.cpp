@@ -19,6 +19,7 @@ using namespace std::chrono_literals;
 YAML::Node sample_data = YAML::LoadFile("test.yaml");
 Synchro synchro(sample_data, true);
 DataLoader_SemKITTI dl;
+  cv_ext::BasicTimer bt;
 
 bool already_written = false;
 
@@ -99,10 +100,10 @@ int main (int argc, char** argv)
       synchro.reset();
 
       dl.readData(seq, sample_idx, sample_data);
-
+      bt.reset();
       for (auto cyl : cyls)
-        cyl->OnlineRoutine(dl, cyl->level ? cyls[cyl->level-1] : nullptr); 
-      // std::cout << "idx " << sample_idx << " total latency: " << bt.elapsedTimeMs() << " ms" << std::endl;
+        cyl->OnlineRoutine_Profile(dl, cyl->level ? cyls[cyl->level-1] : nullptr); 
+      std::cout << "idx " << sample_idx << " total latency: " << bt.elapsedTimeMs() << " ms" << std::endl;
      
       handleOut(cyls, sample_idx);
       
