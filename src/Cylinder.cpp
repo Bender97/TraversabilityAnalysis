@@ -154,7 +154,8 @@ void Cylinder::inheritFeatures(Cylinder *cyl_) {
   
   for (i=0; i<tot_cells; i++) {
     if (grid[i].status==UNPREDICTABLE) continue;
-    
+    // if (grid[i].label==UNKNOWN_CELL_LABEL) continue;
+
     for (j=0; j<prevfeats_num; j++)
       features[i].derived_features[j] = cyl_->features[inherit_idxs[i]].derived_features[j];
 
@@ -227,6 +228,7 @@ void Cylinder_SemKITTI::computeTravGT(std::vector<int> &labels) {
     cell = &(grid[r]);
     if (cell->points_idx.size() < MIN_NUM_POINTS_IN_CELL) {
       cell->label = UNKNOWN_CELL_LABEL;
+      cell->status = UNPREDICTABLE;
       continue;
     }
 
@@ -245,7 +247,10 @@ void Cylinder_SemKITTI::computeTravGT(std::vector<int> &labels) {
     else {
         if (non_trav_cont > 3 ) cell->label = NOT_TRAV_CELL_LABEL;
         else if (trav_cont > 1) cell->label = TRAV_CELL_LABEL;
-        // else cell->label = UNKNOWN_CELL_LABEL;
+        else {
+          cell->label = UNKNOWN_CELL_LABEL;
+          cell->status = UNPREDICTABLE;
+        }
     }
 
     GT_labels_vector.at<float>(valid_rows, 0) = cell->label;
@@ -460,8 +465,8 @@ void Cylinder::process(Eigen::MatrixXd &scene_normal, std::vector<Eigen::Vector3
 
   // fill cv::Mat full_featMatrix
   for (r=0; r<tot_cells; r++) {
-    // if (grid[r].status == UNPREDICTABLE)
-    if (grid[r].label == UNKNOWN_CELL_LABEL)
+    if (grid[r].status == UNPREDICTABLE)
+    // if (grid[r].label == UNKNOWN_CELL_LABEL)
       continue;
 
     feat = features[r].toVectorTransformed();
@@ -508,7 +513,8 @@ void Cylinder::process(Eigen::MatrixXd &scene_normal, std::vector<Eigen::Vector3
 void Cylinder::computeAccuracy() {
     tmetric.resetAcc();
     for (int c=0; c<tot_cells; c++) {
-      if (grid[c].label == UNKNOWN_CELL_LABEL) continue;
+      // if (grid[c].label == UNKNOWN_CELL_LABEL) continue;
+      if (grid[c].status == UNPREDICTABLE) continue;
       tmetric.update(grid[c].predicted_label, grid[c].label);
     }
     gmetric += tmetric;
@@ -517,10 +523,15 @@ void Cylinder::computeAccuracy() {
 void Cylinder::computeFeatures(Eigen::MatrixXd &scene_normal, std::vector<Eigen::Vector3d> &points) {
   bool status;
   for (int r=0; r<(int)features.size(); r++) {
-    if (grid[r].points_idx.size()>=MIN_NUM_POINTS_IN_CELL) {
-      status = features[r].computeFeatures(&grid[r], scene_normal, points, area[r]);
-      if (status) grid[r].status=PREDICTABLE;
+    if (grid[r].points_idx.size()<2) continue;
+    status = features[r].computeFeatures(&grid[r], scene_normal, points, area[r]);
+    if (!status) {
+      grid[r].label=UNKNOWN_CELL_LABEL; // even though it has more than 2 points, features are uncomputable.
+      grid[r].status=UNPREDICTABLE; 
     }
+    else
+      grid[r].status=PREDICTABLE;
+
   }
 }
 

@@ -209,7 +209,7 @@ void Synchro::updateTriang(int level, std::vector<Cell> &grid) {
       label = grid[idx].predicted_label;
       gtlabel = grid[idx].label;
 
-           if (label==UNKNOWN_CELL_LABEL) color_ = darkgray;
+           if (gtlabel==UNKNOWN_CELL_LABEL) color_ = darkgray;
       else if (label>0) {
         if (label*gtlabel>0) color_ = tp_color;
         else color_ = fp_color;
