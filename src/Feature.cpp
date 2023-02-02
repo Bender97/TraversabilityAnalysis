@@ -186,13 +186,33 @@ int Feature::computeFeatures(Cell *cell, Eigen::MatrixXd &scene_normal, std::vec
   computeCorrelationMatrix(cell->points_idx, points);
 
   Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eigensolver(matA1);
-  if (eigensolver.info() != Eigen::Success) return 0;
+  if (eigensolver.info() != Eigen::Success) {
+    std::cout << "eigen solver info: not success\n";
+    return 0;
+  }
   // store eigenvalues in an easy way
   d1 = eigensolver.eigenvalues()(0);
   d2 = eigensolver.eigenvalues()(1);
   d3 = eigensolver.eigenvalues()(2);
 
-  if (d1<1e-8 ||  d2<1e-8 || d3<1e-8) return 0;
+  // if (d1<1e-8 ||  d2<1e-8 || d3<1e-8) {
+  //   std::cout << "d1 d2 d3\n";
+  //   return 0;
+  // }
+
+  if (d1<1e-8)  {
+    // std::cout << "d1\n";
+    //return 0;
+    d1=1e-8;
+  }
+
+  if (d2<1e-8)  {
+    d2=1e-8;
+  }
+
+  if (d3<1e-8)  {
+    d3=1e-8;
+  }
 
   nvx = eigensolver.eigenvectors()(0, 0);
   nvy = eigensolver.eigenvectors()(1, 0);
@@ -210,7 +230,10 @@ int Feature::computeFeatures(Cell *cell, Eigen::MatrixXd &scene_normal, std::vec
 
   d = - ( nvx * cx + nvy * cy + nvz * cz );
   normal_magnitude = eigensolver.eigenvectors().col(0).norm();
-  if (!normal_magnitude) return 0;
+  if (!normal_magnitude) {
+    std::cout << "normal_magnitude\n";
+    return 0;
+  }
 
   /// ROUGHNESS-BASED
   angle = std::acos(nvz);    // normal.z = normal.x*0 + normal.y*0 + normal.z*1, with z = (0, 0, 1)

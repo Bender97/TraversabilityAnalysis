@@ -94,6 +94,10 @@ Cylinder::Cylinder(YAML::Node &node,  Cylinder *cyl_, ExpMode expmode_) : Cylind
     
     if (store_features_filename.empty()) 
       throw std::runtime_error(std::string("\033[1;31mERROR\033[0m. Please provide a valid outfile path. Found empty!\n"));
+
+    if (check_file_exists(store_features_filename)) 
+      throw std::runtime_error(std::string("\033[1;93mWARNING!\033[0m FILE " + store_features_filename + " EXISTS! Please manually remove it.\n"));
+
     std::ofstream out(store_features_filename.c_str(), std::ios::out | std::ios::binary);
     out.close();
   } 
@@ -305,12 +309,9 @@ void Cylinder::computePredictedLabel(std::vector<int> &labels) {
   int unk=0;
   int label;
 
-
   for (auto &cell : grid) {
-    if (cell.points_idx.size() < MIN_NUM_POINTS_IN_CELL) {
-      // cell.label = UNKNOWN_CELL_LABEL;
+    if (cell.points_idx.size() < MIN_NUM_POINTS_IN_CELL)
       continue;
-    }
 
     trav_cont = non_trav_cont = road = sidewalk=0;
 
@@ -527,7 +528,8 @@ void Cylinder::computeFeatures(Eigen::MatrixXd &scene_normal, std::vector<Eigen:
     status = features[r].computeFeatures(&grid[r], scene_normal, points, area[r]);
     if (!status) {
       grid[r].label=UNKNOWN_CELL_LABEL; // even though it has more than 2 points, features are uncomputable.
-      grid[r].status=UNPREDICTABLE; 
+      grid[r].status=UNPREDICTABLE;
+      std::cout << "UNPREDICTABLE FEATURE!\n";
     }
     else
       grid[r].status=PREDICTABLE;
@@ -536,7 +538,7 @@ void Cylinder::computeFeatures(Eigen::MatrixXd &scene_normal, std::vector<Eigen:
 }
 
 void Cylinder::storeFeaturesToFile() {
-  std::ofstream out(store_features_filename.c_str(), std::ios::binary);
+  std::ofstream out(store_features_filename.c_str(), std::ios::binary | std::ios::app);
   if (!out) 
       throw std::runtime_error("\033[1;31mERROR\033[0m.  OUTSTREAM opening  "
         + store_features_filename);
@@ -561,7 +563,7 @@ void Cylinder::produceFeaturesRoutine(DataLoader &dl, Cylinder *back_cyl) {
   computeTravGT(dl.labels);
   computeFeatures(dl.scene_normal, dl.points);
   if (level>0) inheritGTFeatures(back_cyl);
-  computeAccuracy();
+  // computeAccuracy();
   storeFeaturesToFile();
 }
 
