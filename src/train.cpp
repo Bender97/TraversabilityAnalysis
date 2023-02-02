@@ -161,6 +161,9 @@ int main (int argc, char** argv)
                   << " training " << td->X_train.rows << " rows " << td->X_train.cols << " cols"
                   << " max_iter: " << max_iter << "  ##  nu: " << nu 
                   << " C: " << C << " gamma: " << gamma << std::endl;
+        
+        td->svm_gamma = gamma;
+        td->svm_nu = nu;
 
         // TRAIN MODEL: SET PARAMS
         cv::Ptr<cv::ml::SVM> local_model;

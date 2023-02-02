@@ -201,7 +201,7 @@ int Feature::computeFeatures(Cell *cell, Eigen::MatrixXd &scene_normal, std::vec
   // }
 
   if (d1<1e-8)  {
-    // std::cout << "d1\n";
+    //  std::cout << "d1 " << cell->points_idx.size() << " " << d1 << " " << d2 << " " << d3 << "\n";
     //return 0;
     d1=1e-8;
   }

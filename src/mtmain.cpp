@@ -116,7 +116,6 @@ void produceFeatures(int thread_idx, int start, int end, std::vector<Pair> &pair
   mu2.lock();
   std::string temp = sample_data["general"]["store_features_filename"].as<std::string>();
   sample_data["general"]["store_features_filename"] = temp + "_" + std::to_string(thread_idx);
-  std::cout << "HI FROM PRODUCE " + sample_data["general"]["store_features_filename"].as<std::string>() << std::endl;
   loadCyls(cyls, sample_data);
   sample_data["general"]["store_features_filename"] = temp;
   mu2.unlock();
@@ -198,7 +197,7 @@ int main (int argc, char** argv) {
 
   std::vector<Pair> pairs;
   for (auto seq: seqs) {
-    int tot = 10; //count_samples(sample_data, seq);
+    int tot = count_samples(sample_data, seq);
     for (int i=0; i<tot; i++) pairs.push_back(Pair(seq, i));
   }
 

@@ -81,8 +81,7 @@ Cylinder::Cylinder(YAML::Node &node,  Cylinder *cyl_, ExpMode expmode_) : Cylind
     f.derived_features.resize((1+TOT_GEOM_FEATURES)*level);
   
   if (expmode == ExpMode::test) {
-    std::string cname = load_path + "lv" + std::to_string(level) + "/"
-               + modes[mode] + (trick_mode ? "_trick" : "") + "/config_data" + std::to_string(level) + ".yaml";
+    std::string cname = getNormalizerConfigName(load_path);
     normalizer = Normalizer(tot_geom_features_across_all_levels, cname.c_str());
   }
   else {
@@ -545,6 +544,10 @@ void Cylinder::storeFeaturesToFile() {
   
   for (int i=0; i<(int) grid.size(); i++) {
     if (grid[i].label == UNKNOWN_CELL_LABEL) continue;
+    if (level==2) {
+      std::cout << features[i].toString() << std::endl;
+      throw std::runtime_error(std::string("just finished"));
+    }
     features[i].toFile(out);
     float lab = static_cast<float> (grid[i].label);
     out.write( reinterpret_cast<const char*>( &(lab) ), sizeof( float ));
@@ -627,16 +630,18 @@ std::string Cylinder::getSVMName(std::string prefix) {
 }
 std::string Cylinder::getPCAConfigName(std::string prefix) {
   return prefix + "lv" + std::to_string(level) + "/"
-    + modes[mode] + (trick_mode ? "_trick" : "") + "/pca_config_data"
+    + modes[mode] + (trick_mode ? "_trick" : "") + "/pca_config"
     + std::to_string(pca_mode) + ".yaml";
 }
 std::string Cylinder::getNormalizerConfigName(std::string prefix) {
-  return prefix + "pca_config_data" + std::to_string(pca_mode) + ".yaml";
+  return prefix + "lv" + std::to_string(level) + "/"
+    + modes[mode] + (trick_mode ? "_trick" : "") 
+    + "/norm_config" + std::to_string(pca_mode) + ".yaml";
 }
 std::string Cylinder::getYAMLMetricsName() {
   return save_path + "lv" + std::to_string(level) + "/"
     + modes[mode] + (trick_mode ? "_trick" : "") + "/"
-    + (mode>=3 ? "_" + std::to_string(pca_mode) : "") + "_" 
+    + (mode>=3 ? std::to_string(pca_mode) : "") + "_" 
     + cleanFloatStr(svm_nu) + "_" 
     + cleanFloatStr(svm_gamma) + ".yaml";
 }

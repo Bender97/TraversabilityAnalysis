@@ -186,7 +186,9 @@ void TrainDataset::load() {
   if (normalizer.empty()) {
     normalizer = Normalizer(tot_geom_features_across_all_levels);
 
-    std::string cname = save_path + "config_data" + std::to_string(level) + ".yaml";
+    std::string cname = getNormalizerConfigName(save_path);
+
+    std::cout << "going to store normalizer to " << cname << std::endl;
 
     normalizer.normalize_train_and_store(X_train, cname);
 
@@ -217,7 +219,7 @@ void TrainDataset::load() {
                 cv::ml::ROW_SAMPLE,
                 pca_mode);
 
-      cv::FileStorage fs(getNormalizerConfigName(save_path), cv::FileStorage::WRITE);
+      cv::FileStorage fs(getPCAConfigName(save_path), cv::FileStorage::WRITE);
       pca.write(fs);
       fs.release();
     }
