@@ -81,35 +81,36 @@ void DataLoader_NuSc::readData(int , int idx, YAML::Node &) {
 }
 
 void DataLoader_SemKITTI::readPredicted(int seq, int idx, YAML::Node &sample_data) {
-  points.clear();
-  labels.clear();
+  // points.clear();
+  // labels.clear();
   std::string seq_s = std::to_string(seq);
   std::string idx_s = std::to_string(idx);
   auto new_seq_s = std::string(2 - MIN(2, seq_s.length()), '0') + seq_s;
   auto new_idx_s = std::string(6 - MIN(6, idx_s.length()), '0') + idx_s;
 
   c = 0;
-  std::ifstream fin(sample_data["general"]["dataset_path"].as<std::string>()+"sequences/"+new_seq_s+"/velodyne/"+new_idx_s+".bin", std::ios::binary);
+  // std::ifstream fin(sample_data["general"]["dataset_path"].as<std::string>()+"sequences/"+new_seq_s+"/velodyne/"+new_idx_s+".bin", std::ios::binary);
   
-  while (fin.read(reinterpret_cast<char*>(&f), sizeof(float))) {
+  // while (fin.read(reinterpret_cast<char*>(&f), sizeof(float))) {
     
-         if (c==0) p(0) = f;
-    else if (c==1) p(1) = f;
-    else if (c==2) p(2) = f;
-    else points.push_back(p);
+  //        if (c==0) p(0) = f;
+  //   else if (c==1) p(1) = f;
+  //   else if (c==2) p(2) = f;
+  //   else points.push_back(p);
 
-    c = (c + 1) %4;
-  }
+  //   c = (c + 1) %4;
+  // }
+  pred_labels.clear();
 
   std::string base_path = sample_data["general"]["predicted_path"].as<std::string>();
   std::ifstream lin(base_path + "/"+new_idx_s+".label", std::ios::binary);
-  // std::cout << base_path+new_seq_s+"/"+new_idx_s+".label" << std::endl;
+  std::cout << base_path+new_seq_s+"/"+new_idx_s+".label" << std::endl;
 
   while (lin.read(reinterpret_cast<char*>(&c), sizeof(int))) {
-    if (c==2) {labels.push_back(NOT_TRAV_CELL_LABEL);}
-    else if (c==1) labels.push_back(TRAV_CELL_LABEL);
-    else if (c==3) labels.push_back(3); // sidewalk
-    else labels.push_back(0);
+    if (c==2) {pred_labels.push_back(NOT_TRAV_CELL_LABEL);}
+    else if (c==1) pred_labels.push_back(TRAV_CELL_LABEL);
+    else if (c==3) pred_labels.push_back(3); // sidewalk
+    else pred_labels.push_back(0);
   }
 
   // for (int i=0; i<20; i++) std::cout << labels[i] << std::endl;

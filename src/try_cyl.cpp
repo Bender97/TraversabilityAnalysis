@@ -87,7 +87,6 @@ int main (int argc, char** argv)
   
   loadCyls(cyls, sample_data);
 
-
   for (auto &seq : seqs) {
 
     int tot_samples = sample_data["general"]["sample_idx_end"].as<int>(); //count_samples(sample_data, seq);  

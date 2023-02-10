@@ -81,8 +81,11 @@ Cylinder::Cylinder(YAML::Node &node,  Cylinder *cyl_, ExpMode expmode_) : Cylind
     f.derived_features.resize((1+TOT_GEOM_FEATURES)*level);
   
   if (expmode == ExpMode::test) {
+  // if (level<2) {
     std::string cname = getNormalizerConfigName(load_path);
+    std::cout << "  loading  norm from " << cname << std::flush;
     normalizer = Normalizer(tot_geom_features_across_all_levels, cname.c_str());
+    std::cout << " done!" << std::endl;
   }
   else {
     std::string ofname;
@@ -99,6 +102,7 @@ Cylinder::Cylinder(YAML::Node &node,  Cylinder *cyl_, ExpMode expmode_) : Cylind
 
     std::ofstream out(store_features_filename.c_str(), std::ios::out | std::ios::binary);
     out.close();
+
   } 
   // pre-compute the index from which to inherit features
   if (cyl_!=nullptr) {
@@ -185,6 +189,16 @@ void Cylinder::inheritGTFeatures(Cylinder *cyl_) {
     prev_feats = cyl_->features[inherit_idxs[i]].toVectorTransformed();
     for (j=prevfeats_num, c=0; j<prevfeats_num+TOT_GEOM_FEATURES; j++, c++)
       features[i].derived_features[j] = prev_feats[c];
+    int lab = cyl_->grid[inherit_idxs[i]].label;
+    if (lab>1.0f) {
+
+      std::cout << " prev: " << cyl_->grid[inherit_idxs[i]].points_idx.size() << " points at idx " << inherit_idxs[i] << "\n";
+      std::cout << " curr: " << grid[i].points_idx.size() << " points\n";
+
+      
+
+      throw std::runtime_error(std::string("\033[1;31mERROR!\033[0m UNKNOWN INHERITED FEATURE! ") + std::to_string(level));
+    }
     features[i].derived_features[j] = cyl_->grid[inherit_idxs[i]].label;
   }
   
@@ -226,7 +240,6 @@ void Cylinder::computeTravGT(std::vector<int> &labels) {}
 void Cylinder_SemKITTI::computeTravGT(std::vector<int> &labels) {
   int trav_cont, non_trav_cont, road, sidewalk, label;
   Cell *cell;
-
   for (int r=0, valid_rows=0; r<tot_cells; r++) {
     cell = &(grid[r]);
     if (cell->points_idx.size() < MIN_NUM_POINTS_IN_CELL) {
@@ -251,15 +264,14 @@ void Cylinder_SemKITTI::computeTravGT(std::vector<int> &labels) {
         if (non_trav_cont > 3 ) cell->label = NOT_TRAV_CELL_LABEL;
         else if (trav_cont > 1) cell->label = TRAV_CELL_LABEL;
         else {
-          cell->label = UNKNOWN_CELL_LABEL;
-          cell->status = UNPREDICTABLE;
+          cell->label = NOT_TRAV_CELL_LABEL;
         }
     }
 
     GT_labels_vector.at<float>(valid_rows, 0) = cell->label;
     valid_rows++;
-
   }
+
 
 }
 
@@ -311,6 +323,8 @@ void Cylinder::computePredictedLabel(std::vector<int> &labels) {
   for (auto &cell : grid) {
     if (cell.points_idx.size() < MIN_NUM_POINTS_IN_CELL)
       continue;
+    
+    cell.status = PREDICTABLE;
 
     trav_cont = non_trav_cont = road = sidewalk=0;
 
@@ -523,7 +537,7 @@ void Cylinder::computeAccuracy() {
 void Cylinder::computeFeatures(Eigen::MatrixXd &scene_normal, std::vector<Eigen::Vector3d> &points) {
   bool status;
   for (int r=0; r<(int)features.size(); r++) {
-    if (grid[r].points_idx.size()<2) continue;
+    if (grid[r].points_idx.size()<MIN_NUM_POINTS_IN_CELL) continue;
     status = features[r].computeFeatures(&grid[r], scene_normal, points, area[r]);
     if (!status) {
       grid[r].label=UNKNOWN_CELL_LABEL; // even though it has more than 2 points, features are uncomputable.
@@ -544,10 +558,10 @@ void Cylinder::storeFeaturesToFile() {
   
   for (int i=0; i<(int) grid.size(); i++) {
     if (grid[i].label == UNKNOWN_CELL_LABEL) continue;
-    if (level==2) {
-      std::cout << features[i].toString() << std::endl;
-      throw std::runtime_error(std::string("just finished"));
-    }
+    // if (level==2) {
+    //   std::cout << features[i].toString() << std::endl;
+    //   throw std::runtime_error(std::string("just finished"));
+    // }
     features[i].toFile(out);
     float lab = static_cast<float> (grid[i].label);
     out.write( reinterpret_cast<const char*>( &(lab) ), sizeof( float ));
@@ -561,12 +575,14 @@ void Cylinder::produceFeaturesRoutine(DataLoader &dl, Cylinder *back_cyl) {
           std::string("\033[1;31mERROR\033[0m. provided a cylinder of level ") 
         + std::to_string(level) + std::string(" with nullptr back cylinder.\n"));
   }
+
   resetGrid();
   sortBins_cyl(dl.points);
   computeTravGT(dl.labels);
   computeFeatures(dl.scene_normal, dl.points);
-  if (level>0) inheritGTFeatures(back_cyl);
-  // computeAccuracy();
+  // if (level>0) inheritGTFeatures(back_cyl);
+  if (level>0) inheritFeatures(back_cyl);
+  if (level<2) process(dl.scene_normal, dl.points);
   storeFeaturesToFile();
 }
 

@@ -21,7 +21,7 @@ enum class ExpMode {produce, DL, test};
 #define PREDICTABLE  1.0f
 #define UNPREDICTABLE  -1.0f
 
-#define MIN_NUM_POINTS_IN_CELL 2
+#define MIN_NUM_POINTS_IN_CELL 4
 
 
 

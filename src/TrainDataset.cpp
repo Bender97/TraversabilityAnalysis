@@ -1,5 +1,30 @@
 #include "TrainDataset.h"
 
+class ProgressBar {
+public:
+    float progress = 0.0;
+    int barWidth;
+    std::string msg;
+    ProgressBar(int barWidth_, const std::string &msg_) {barWidth = barWidth_; msg = msg_;}
+    ProgressBar(int barWidth_) {barWidth = barWidth_; msg="";}
+    ~ProgressBar() {update(1.0f);}
+
+    void update(float progress) {
+
+        int pos = barWidth * progress;
+        std::cout << msg << " [";
+        for (int i = 0; i < barWidth; ++i) {
+            if (i < pos) std::cout << "=";
+            else if (i == pos) std::cout << ">";
+            else std::cout << " ";
+        }
+        std::cout << "] " << int(progress * 100.0) << " %\r";
+        std::cout.flush();
+
+        if (progress>=1.0f) std::cout << std::endl;
+    }
+};
+
 TrainDataset::TrainDataset(YAML::Node &node_cyl, int level_, bool train_flag)
     : Cylinder(node_cyl) 
 {
@@ -40,9 +65,19 @@ void TrainDataset::init(YAML::Node &node_cyl, int level_, bool train_flag) {
   save_path = sanitize(node_cyl["save_path"].as<std::string>());
   load_path = sanitize(node_cyl["load_path"].as<std::string>());
 
+  seed = node_cyl["seed"].as<uint16_t>();
+
   store_features_filename = load_path + (!train_flag ? "val_" : "") + store_features_filename + std::to_string(level_) + ".bin";
 
+  // if (train_flag) {
+  //   store_features_filename = load_path + "features_data_notgt" + std::to_string(level_) + ".bin";
+  // }
+  // else {
+  //   store_features_filename = load_path + "val_features_data" + std::to_string(level_) + ".bin";
+  // }
+
   std::cout << "train level: " << level << "  " << std::flush;
+  std::cout << "fname: " << store_features_filename << "  " << std::flush;
 
   mode = node_cyl["mode"].as<int>();
   std::cout << "training in " << modes[mode] << " mode  " << std::flush;
@@ -60,6 +95,8 @@ void TrainDataset::readLabels() {
   Feature feature;
   float label;
   int pos = 0;
+
+
   std::ifstream in(store_features_filename.c_str(), std::ios::in | std::ios::binary);
   if (level>0 && trick_mode) {
     while(true) {
@@ -73,17 +110,20 @@ void TrainDataset::readLabels() {
     }
   }
   else {
+    ProgressBar pbar(70, "reading labels: ");
     while(true) {
         if (!feature.ignoreFeatureFromFile(in, inherited_labels_size)) break;
         in.read( reinterpret_cast< char*>( &(label) ), sizeof( float ));
         y_train.at<float>(pos, 0) = static_cast<float>((float)label);
         if (label>0) cont_trav ++;
         else cont_nontrav++;
+        if (pos%10000==0) pbar.update(pos/(float)tot_samples_found);
         pos++;
     }
   }
 
-  std::cout << " read Labels: found: " << pos << " samples\n";
+  std::cout << " read Labels: found: " << pos << " samples:  " 
+            << cont_trav << " T and " << cont_nontrav << " nT." << std::endl;
   in.close();
 }
 
@@ -93,6 +133,10 @@ void TrainDataset::loadData() {
   float label;
   float *features_matrix_data_row;
   int pos=0, row, c;
+
+  ProgressBar pbar(70, "loading features: ");
+
+  int step = num_entries_to_train_on / 100;
 
   std::ifstream feat_file(store_features_filename.c_str(), std::ios::in | std::ios::binary);
 
@@ -110,7 +154,7 @@ void TrainDataset::loadData() {
     for (c=0; c<max_feats_num; c++) features_matrix_data_row[c] = vec[re_idx[c]];
     
     y_train.at<float>(pos, 0) = static_cast<float>((float)label);
-
+    if (pos%step==0) pbar.update(pos / (float)num_entries_to_train_on);
     pos++;
   }
 
@@ -118,10 +162,28 @@ void TrainDataset::loadData() {
 }
 
 void TrainDataset::sampleIdxs() {
-  // generate numbers
+
+  if (tot_samples_found == 402088) {
+    std::cout << "NO SAMPLE. GOING WITH 402088\n";
+    for (int i=0; i<402088; i++) sampled_idxs[i] = i;
+    return;
+  }
+  if (tot_samples_found == 1348715) {
+    std::cout << "NO SAMPLE. GOING WITH 1348715 (sampled_idxs size is " << sampled_idxs.size() << ")\n";
+    for (int i=0; i<1348715; i++) sampled_idxs[i] = i;
+    return;
+  }
   std::default_random_engine rand_dev{static_cast<long unsigned int>(1)};;
   std::mt19937               generator(rand_dev());
-  std::uniform_int_distribution<>  distr(0, tot_samples_found-1);
+  // generate numbers
+  if (seed==-1) {
+    seed = (uint16_t)time(0);
+  }
+  // if (tot_samples_found>50063723) seed = 42414;
+  // if (tot_samples_found>100000) seed = 61569;
+  std::cout << " SEEEEEEEEED: " << seed << std::endl;
+  std::uniform_int_distribution<>  distr(seed, tot_samples_found-1);
+  // std::uniform_int_distribution<>  distr(0, tot_samples_found-1);
   ///// sample feature rows to select only a subsample of the whole training set
   taken.resize(tot_samples_found, false);
   counters[0] = 0; counters[1] = 0;
@@ -142,6 +204,41 @@ void TrainDataset::sampleIdxs() {
   }
 }
 
+void TrainDataset::sampleIdxs_ContextBased() {
+
+  
+  std::default_random_engine rand_dev{static_cast<long unsigned int>(1)};;
+  std::mt19937               generator(rand_dev());
+
+  int BLOCK_SIZE = 500000;
+
+  int to_sample = std::floor((float)BLOCK_SIZE / tot_samples_found * num_entries_to_train_on);
+
+  int cont = 0;
+    int num;
+
+  // generate numbers
+  std::cout << " SEEEEEEEEED (ContextBased): " << seed << std::endl;
+  std::uniform_int_distribution<>  distr(seed, BLOCK_SIZE-1);
+  for (int offset=0; offset<tot_samples_found; offset+=BLOCK_SIZE) {
+
+    ///// sample feature rows to select only a subsample of the whole training set
+    taken.resize(BLOCK_SIZE, false);
+
+    for (int t=0; t<to_sample; t++)  {
+      bool flag = true;
+      while(flag) {
+        num = distr(generator);
+        if (!taken[num]) flag=false;
+      }
+
+      taken[num]=true;
+      sampled_idxs[cont++] = num+offset;
+      if (cont==num_entries_to_train_on) break;
+    }
+  }
+}
+
 void TrainDataset::load() {
 
   std::cout << "loading file \033[1;33m" << store_features_filename << "\033[0m" << std::flush;
@@ -154,26 +251,33 @@ void TrainDataset::load() {
   tot_samples_found = in.tellg() / (sizeof(float)*(TOT_GEOM_FEATURES + inherited_labels_size+1));
   std::cout << " found: " << tot_samples_found << " samples\n";
 
+
   y_train = cv::Mat(tot_samples_found, 1, CV_32FC1);
 
   readLabels();
   sampled_idxs = std::vector<int>(num_entries_to_train_on);
-  std::cout << " found: " << tot_samples_found << " entries, " << cont_trav << " T and " << cont_nontrav << " nT." << std::endl;
+  
+  // if (num_entries_to_train_on>30000)
+  //   sampleIdxs();
+  // else {
+  //   std::fstream myfile("results3/pcas/idxs.txt", std::ios_base::in);
+  //   int a=0;
+  //   while (myfile >> sampled_idxs[a])
+  //       //printf("%f ", a);
+  //       a++;
+  //   //for (int i=0; i<10; i++) std::cout << i << " " << sampled_idxs[i] << std::endl;
+  //   //throw std::runtime_error(std::string("just finished."));
+  // }
+  if (num_entries_to_train_on<100000) sampleIdxs_ContextBased();
+  else sampleIdxs();
 
-
-  sampleIdxs();
 
   std::sort(sampled_idxs.begin(), sampled_idxs.end());
 
   X_train = cv::Mat(num_entries_to_train_on, (int) max_feats_num, CV_32F);
   y_train = cv::Mat(num_entries_to_train_on, 1, CV_32FC1);
 
-
-
   loadData();
-
-
-  std::cout << y_train.rows << " " << y_train.cols << std::endl;
   
   // simple checks
   if (num_entries_to_train_on<0) {
@@ -188,11 +292,7 @@ void TrainDataset::load() {
 
     std::string cname = getNormalizerConfigName(save_path);
 
-    std::cout << "going to store normalizer to " << cname << std::endl;
-
     normalizer.normalize_train_and_store(X_train, cname);
-
-    std::cout << "norm config saved to " << cname << std::endl;
 
     if (!normalizer.check4NormalizationErrors(X_train)) {
       throw std::runtime_error(std::string("\033[1;31mERROR!\033[0m Found Not normalized data. abort."));
@@ -232,10 +332,10 @@ void TrainDataset::load() {
     std::cout << "now X_train has " << X_train.cols << std::endl;
   }
 
-  std::cout << X_train.rows << " " << X_train.cols << std::endl;
-  std::cout << y_train.rows << " " << y_train.cols << std::endl;
+  // std::cout << X_train.rows << " " << X_train.cols << std::endl;
+  // std::cout << y_train.rows << " " << y_train.cols << std::endl;
 
-  std::cout << X_train.row(0) << std::endl;
+  // std::cout << X_train.row(0) << std::endl;
 
 
 }

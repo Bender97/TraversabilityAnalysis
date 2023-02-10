@@ -59,7 +59,10 @@ void loadCyls(std::vector<T*> &cyls, YAML::Node &sample_data, bool verbose=false
     
     if (data_=="SemKITTI") {
       std::cout << "creating cyl at level " << level << std::endl;
-      auto cyl = new Cylinder_SemKITTI(node, back_cyl, ExpMode::produce); 
+      Cylinder_SemKITTI *cyl;
+      if (level<2) cyl = new Cylinder_SemKITTI(node, back_cyl, ExpMode::test); 
+      else cyl = new Cylinder_SemKITTI(node, back_cyl, ExpMode::produce); 
+      // auto cyl = new Cylinder_SemKITTI(node, back_cyl, ExpMode::produce); 
       if (verbose) cyl->printSummary();   
       cyls.push_back(cyl);
     }

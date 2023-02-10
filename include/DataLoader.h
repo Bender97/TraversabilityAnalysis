@@ -26,6 +26,7 @@ public:
   DataLoader();
   std::vector<Eigen::Vector3d> points;
   std::vector<int> labels;
+  std::vector<int> pred_labels;
   Eigen::MatrixXd scene_normal;
 
   open3d::geometry::PointCloud pc;

@@ -91,5 +91,5 @@ target_link_libraries(train ${custom_libs} traindataset ${OpenCV_LIBS} )
 add_executable(test src/try_cyl.cpp)
 target_link_libraries(test  ${custom_libs})
 
-# add_executable(test_dl src/test_labels.cpp)
-# target_link_libraries(test_dl ${Boost_LIBRARIES} ${Boost_FILESYSTEM_LIBRARY} ${custom_libs} ${OpenCV_LIBS}  Open3D::Open3D )
+add_executable(test_dl src/test_labels.cpp)
+target_link_libraries(test_dl ${custom_libs} )

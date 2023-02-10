@@ -30,6 +30,7 @@ public:
   std::vector<float> nu_vec, C_vec, gamma_vec;
 
   int ref_label_idx;
+  uint16_t seed;
 
   std::vector<bool> taken;
 
@@ -49,6 +50,7 @@ public:
   void readLabels();
   void loadData();
   void sampleIdxs();
+  void sampleIdxs_ContextBased();
   void checkFileAndConfigAreValid(int feats_size, int tot_entries, int cont_trav, int cont_nontrav);
 };
 

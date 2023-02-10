@@ -46,8 +46,8 @@ int train_level, train_mode, pca_mode=-1, max_iter=1000, trick_mode=0;
 
 std::vector<std::string> modes = std::vector<std::string>({"geom", "geom_label", "geom_all", "geom_pca", "geom_pca_label", "geom_pca_all_label"});
 
-std::vector<TrainDataset> train_datasets;
-std::vector<TrainDataset> val_datasets;
+std::vector<TrainDataset> train_datasets, train_datasets2;
+std::vector<TrainDataset> val_datasets, val_datasets2;
 
 void computeAcc(TrainDataset *td, cv::Mat &pred, Metric &metric, std::string msg) {
   double plab;
@@ -56,8 +56,9 @@ void computeAcc(TrainDataset *td, cv::Mat &pred, Metric &metric, std::string msg
     plab = pred.at<float>(r, 0) > 0 ? 1.0f : -1.0f;
     metric.update(plab, td->y_train.at<float>(r, 0));
   }
-
-  metric.print(msg.c_str(), td->tot_cells, 1);
+  if (pred.rows > 50000 && metric.acc()>0.9075)
+    metric.printV(msg.c_str(), td->tot_cells, 1);
+  else metric.print(msg.c_str(), td->tot_cells, 1);
 }
 
 void analyze(std::vector<int> &labs) {
@@ -122,17 +123,26 @@ void parseConfig(std::string path) {
   node["load_path"] = sample_data["general"]["load_path"];
   node["save_path"] = sample_data["general"]["save_path"];
   node["store_features_filename"] = sample_data["general"]["store_features_filename"];
+  node["seed"] = sample_data["general"]["seed"];
+
+  for (int a=0; a<1; a++) {
+    TrainDataset td(node, train_level, true);
+    std::cout << " -- Will train on:" << std::endl;
+    train_datasets.push_back(td);
+    td.summary();
+  }
 
 
-  TrainDataset td(node, train_level, true);
-  std::cout << " -- Will train on:" << std::endl;
-  train_datasets.push_back(td);
-  td.summary();
+  // TrainDataset vd(node, train_level, train_datasets[0].normalizer, train_datasets[0].pca, false);
+  // std::cout << " -- Will valid on:" << std::endl;
+  // val_datasets.push_back(vd);
+  // vd.summary();
 
-  TrainDataset vd(node, train_level, td.normalizer, td.pca, false);
+  node["store_features_filename"] = "features_data_4p_notgt";
+  TrainDataset vd2(node, train_level, train_datasets[0].normalizer, train_datasets[0].pca, false);
   std::cout << " -- Will valid on:" << std::endl;
-  val_datasets.push_back(vd);
-  vd.summary();
+  val_datasets2.push_back(vd2);
+  vd2.summary();
 
 }
 
@@ -145,64 +155,158 @@ int main (int argc, char** argv)
 
   std::vector<Results> results;
   cv::Mat predictions_vector;
-  Metric tmetric, vmetric;
-  TrainDataset *td, *vd;
-  float C = 1.0f;
+  Metric tmetric, vmetric, vmetric2, gvmetric, bestvmetric;
+  TrainDataset *vd, *td2, *vd2;
 
-  for (size_t i=0; i<train_datasets.size(); i++) {
 
-    td = &(train_datasets[i]);
-    vd = &(val_datasets[i]);
+  // td = &(train_datasets[i]);
+  vd = &(val_datasets[0]);
+  vd2 = &(val_datasets2[0]);
 
-    for (auto &nu: td->nu_vec) {
-      for (auto &gamma: td->gamma_vec) {
+  bool skipped=false;
 
-        std::cout << " ##############################      ###########################" << std::endl
-                  << " training " << td->X_train.rows << " rows " << td->X_train.cols << " cols"
-                  << " max_iter: " << max_iter << "  ##  nu: " << nu 
-                  << " C: " << C << " gamma: " << gamma << std::endl;
-        
-        td->svm_gamma = gamma;
-        td->svm_nu = nu;
+  for (auto &C: train_datasets[0].C_vec) {
+    for (auto &nu: train_datasets[0].nu_vec) {
+      for (auto &gamma: train_datasets[0].gamma_vec) {
 
-        // TRAIN MODEL: SET PARAMS
-        cv::Ptr<cv::ml::SVM> local_model;
-        local_model.reset();
-        local_model = cv::ml::SVM::create();
-        local_model->setType(cv::ml::SVM::NU_SVR);
-        local_model->setKernel(cv::ml::SVM::RBF);
-        local_model->setNu(nu);
-        local_model->setGamma(gamma);
-        local_model->setC(C);
-        local_model->setTermCriteria(cv::TermCriteria(cv::TermCriteria::MAX_ITER, max_iter, 1e-6));
+        auto iters = std::vector<int>({ 3400}); //, 4800, 500});
+        // std::vector<int> iters;
+        // for (int i=1900; i<2000; i+=5) iters.push_back(i);
+        for (auto iter: iters) {
+          max_iter = iter;
+          std::cout << " ##############################      ###########################" << std::endl
+                    // << " training " << td->X_train.rows << " rows " << td->X_train.cols << " cols"
+                    << " max_iter: " << max_iter << "  ##  nu: " << nu 
+                    << " C: " << C << " gamma: " << gamma << std::endl;
+          
+          
 
-        // TRAIN
-        local_model->train(td->X_train, cv::ml::ROW_SAMPLE, td->y_train);
+          // TRAIN MODEL: SET PARAMS
+          cv::Ptr<cv::ml::SVM> local_model;
+          local_model.reset();
+          local_model = cv::ml::SVM::create();
+          local_model->setType(cv::ml::SVM::NU_SVR);
+          local_model->setKernel(cv::ml::SVM::RBF);
+          local_model->setNu(nu);
+          local_model->setGamma(gamma);
+          local_model->setC(C);
 
-        // TRAIN ERROR        
-        predictions_vector = cv::Mat::zeros(td->y_train.rows, 1, CV_32F); 
-        tmetric.resetAll();
-        local_model->predict(td->X_train, predictions_vector, cv::ml::StatModel::RAW_OUTPUT);
-        tmetric.checkpointTime();
-        computeAcc(td, predictions_vector, tmetric, "train: ");
+          /*int follow=1;
+          double eps = 1e-4;
+          while(follow) {
+            std::cout << "set term criteria: " << eps << std::endl;
+            local_model->setTermCriteria(cv::TermCriteria(cv::TermCriteria::EPS, 100, eps)); // it was 1e-6
 
-        // VALID ERROR
-        predictions_vector = cv::Mat::zeros(vd->y_train.rows, 1, CV_32F);
-        vmetric.resetAll();
-        local_model->predict(vd->X_train, predictions_vector, cv::ml::StatModel::RAW_OUTPUT);
-        vmetric.checkpointTime();
-        computeAcc(vd, predictions_vector, vmetric, "valid: ");
+            // TRAIN
+            local_model->train(td->X_train, cv::ml::ROW_SAMPLE, td->y_train);
 
-        std::string model_file_name_ = td->getSVMName(td->save_path);
-        local_model->save(model_file_name_);
+            predictions_vector = cv::Mat::zeros(td->y_train.rows, 1, CV_32F); 
+            tmetric.resetAll();
+            local_model->predict(td->X_train, predictions_vector, cv::ml::StatModel::RAW_OUTPUT);
+            tmetric.checkpointTime();
+            computeAcc(td, predictions_vector, tmetric, "train: ");
 
-        results.push_back(Results(nu, C, gamma, tmetric, vmetric));
+            std::cout << "continue? (yes 1, no 0) ";
+            std::cin >> follow;
+            eps /= 1.2;
+          }*/
 
-        //LOG
-        vmetric.log2YAML(nu, gamma, C, pca_mode, 
-                        vd->X_train.rows, vd->tot_cells, 
-                        td->getYAMLMetricsName());
+          for (size_t i=0; i<train_datasets.size(); i++) {
+            
+            td2 = &(train_datasets[i]);
 
+            td2->svm_gamma = gamma;
+            td2->svm_nu = nu;
+            
+            local_model->setTermCriteria(cv::TermCriteria(cv::TermCriteria::MAX_ITER, max_iter, 1e-6)); // it was 1e-6
+            local_model->train(td2->X_train, cv::ml::ROW_SAMPLE, td2->y_train);
+
+            // TRAIN ERROR        
+            predictions_vector = cv::Mat::zeros(td2->y_train.rows, 1, CV_32F); 
+            tmetric.resetAll();
+            local_model->predict(td2->X_train, predictions_vector, cv::ml::StatModel::RAW_OUTPUT);
+            tmetric.checkpointTime();
+            std::string msg1 = "train " + std::to_string(i) + "/" + std::to_string(train_datasets.size()) + ": ";
+            computeAcc(td2, predictions_vector, tmetric, msg1.c_str());
+            float acc = tmetric.acc();
+            skipped = false;
+            // if (acc<0.941) {// || acc>=0.95) {
+            if (acc<0.908) {// || acc>=0.95) {
+              std::cout << "skip!" << std::endl;
+              skipped = true;
+              continue;
+            }
+
+            // VALID ERROR
+            uint32_t block_size = 100000;
+            gvmetric.resetAll();
+            for (int i=0; i<val_datasets2[0].X_train.rows+block_size; i+=block_size) {
+
+              uint32_t end = MIN(val_datasets2[0].X_train.rows-1, i+block_size);
+              uint32_t size = end-i;
+              if (size<=0 || i > val_datasets2[0].X_train.rows-1) break;
+              
+              float checkp = (float) end/(val_datasets2[0].X_train.rows-1);
+
+              // VALID ERROR
+              predictions_vector = cv::Mat::zeros(size, 1, CV_32F);
+              vmetric2.resetAll();
+              local_model->predict(val_datasets2[0].X_train.rowRange(i, end), predictions_vector, cv::ml::StatModel::RAW_OUTPUT);
+              vmetric2.checkpointTime();
+              // computeAcc(&(val_datasets2[0]), predictions_vector, vmetric2, msg3.c_str());
+              double plab;
+
+              for (int r=0; r < size; r++) {
+                plab = predictions_vector.at<float>(r, 0) > 0 ? 1.0f : -1.0f;
+                vmetric2.update(plab, val_datasets2[0].y_train.at<float>(r+i, 0));
+              }
+              gvmetric += vmetric2;
+              if (i>0) {
+                std::cout << "\e[A";
+                std::cout << "\e[A";
+              }
+              // std::cout << "                                                                          ";
+              std::cout << "valid2 : " << std::setw(9) << std::setprecision(5) << checkp*100 << "%: " << vmetric2.acc()*100 << std::endl;
+              std::cout << " glob  : " << std::setw(12) << " "                                         << gvmetric.acc()*100 << std::endl;
+            }
+
+            if (gvmetric > bestvmetric) bestvmetric = gvmetric;
+            // if ( gvmetric.acc()>0.9075)
+            if ( gvmetric.acc()>0.9391)
+              gvmetric.printV("valid2 : ", val_datasets2[0].tot_cells, 1);
+            else gvmetric.print("valid2 : ", val_datasets2[0].tot_cells, 1);
+
+            std::cout << "   \033[1;34m$$ best result up to now: " << bestvmetric.acc() << "\033[0m" << std::endl;
+
+          }
+
+
+
+          // TRAIN ERROR        
+          // predictions_vector = cv::Mat::zeros(td->y_train.rows, 1, CV_32F); 
+          // tmetric.resetAll();
+          // local_model->predict(td->X_train, predictions_vector, cv::ml::StatModel::RAW_OUTPUT);
+          // tmetric.checkpointTime();
+          // computeAcc(td, predictions_vector, tmetric, "train1: ");
+
+          // VALID ERROR
+          // predictions_vector = cv::Mat::zeros(vd->y_train.rows, 1, CV_32F);
+          // vmetric.resetAll();
+          // local_model->predict(vd->X_train, predictions_vector, cv::ml::StatModel::RAW_OUTPUT);
+          // vmetric.checkpointTime();
+          // computeAcc(vd, predictions_vector, vmetric, "valid1: ");
+
+
+          std::string model_file_name_ = train_datasets[0].getSVMName(train_datasets[0].save_path);
+          local_model->save(model_file_name_);
+          if (skipped) continue;
+          results.push_back(Results(nu, C, gamma, tmetric, gvmetric));
+          gvmetric.seed = train_datasets[0].seed;
+          //LOG
+          gvmetric.log2YAML(nu, gamma, C, pca_mode, 
+                          vd2->X_train.rows, vd2->tot_cells, 
+                          train_datasets[0].getYAMLMetricsName());
+        }
       }
     }
   }
@@ -211,8 +315,9 @@ int main (int argc, char** argv)
 
   std::sort(results.begin(), results.end()/*, std::greater<Results>()*/);
 
-  for (auto &res: results) {
-      std::cout << res << std::endl;   
+  // for (auto &res: results) {
+  for  (int i=0; i<MIN(10, results.size()); i++) {
+      std::cout << results[i] << std::endl;   
   }
 
   return 0;

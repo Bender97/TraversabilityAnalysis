@@ -11,31 +11,28 @@
 #include "Synchro.h"
 #include "Cylinder.h"
 #include "cv_ext.h"
-#include <boost/program_options.hpp>
 #include <Eigen/Dense>
 #include "open3d/Open3D.h"
-
-#include "common_funcs.hpp"
 
 #include "yaml-cpp/yaml.h"
 
 std::vector<Eigen::Vector3d> points;
 std::vector<int> labels, pred_labels;
 bool invert = false;
+YAML::Node sample_data = YAML::LoadFile("test.yaml");
 
 using namespace std::chrono_literals;
-Synchro synchro_;
+Synchro synchro(sample_data, true);
 
-std::vector<Cylinder> cyls;
+std::vector<Cylinder_SemKITTI> cyls;
 
 std::string path;
 
 bool already_written = false;
 
-YAML::Node sample_data = YAML::LoadFile("test.yaml");
 
 
-void handleOut(std::vector<Cylinder> &cyls, float step) {
+void handleOut(std::vector<Cylinder_SemKITTI> &cyls, float step) {
   if (already_written) {
     std::cout << "\e[A"; // step
     std::cout << "\e[A";
@@ -64,13 +61,13 @@ int main (int argc, char** argv)
   std::string path = sample_data["general"]["predicted_path"].as<std::string>();
   
   cyls.clear();
-  int tot_geom_features = sample_data["tot_geom_features"].as<int>();
 
   YAML::Node node = sample_data["general"]["cyl02"];
   
-  Cylinder cyl = Cylinder(node, &synchro_, nullptr, tot_geom_features, -1);    
+  Cylinder_SemKITTI cyl = Cylinder_SemKITTI(node, nullptr, ExpMode::DL);    
   cyls.push_back(cyl);
 
+DataLoader_SemKITTI dl;
 
   cv_ext::BasicTimer bt;
   
@@ -87,69 +84,40 @@ int main (int argc, char** argv)
 
   for (auto &seq : seqs) {
 
-    int tot_samples = count_samples(sample_data, seq);  
+    int tot_samples = 4071; //(sample_data, seq);  
 
     std::cout << "(main) parsing seq " << seq << " upto " << tot_samples << std::endl;
-    reset_view=true;
-    std::ofstream fileo("metrics_pvkd.txt");
+    // std::ofstream fileo("metrics_pvkd.txt");
+    synchro.resetViewFlag();
 
     for (int sample_idx=sample_data["general"]["sample_idx_start"].as<int>(); sample_idx < tot_samples; sample_idx++) {
 
       bt.reset();
-
-      points.clear();
-      labels.clear();
-      synchro_.pauseGeometryUpdate();
+      synchro.reset();
 
       // std::cout << pts_s[sample_idx] << std::endl;
+      dl.readData(seq, sample_idx, sample_data);
+      dl.readPredicted(seq, sample_idx, sample_data);
 
-      readData(seq, sample_idx, points, labels, sample_data);
       // readDataNu(pts_s[sample_idx], lab_s[sample_idx], points, labels, sample_data);
-      readPredicted(seq, sample_idx, pred_labels, path);
 
-      std::cout << "points " << points.size() << std::endl;
-      std::cout << "labels " << labels.size() << std::endl;
-      std::cout << "pred_labels " << pred_labels.size() << std::endl;
-
+      std::cout << "points " << dl.points.size() << std::endl;
+      std::cout << "labels " << dl.labels.size() << std::endl;
+      std::cout << "pred_labels " << dl.pred_labels.size() << std::endl;
       
       cyls[0].resetGrid();
-      cyls[0].sortBins_cyl(points);
-      cyls[0].computeGridGroundTruth(labels);
-      cyls[0].computePredictedLabel(pred_labels);
+      cyls[0].sortBins_cyl(dl.points);
+      cyls[0].computeTravGT(dl.labels);
+      cyls[0].computePredictedLabel(dl.pred_labels);
       //cyls[0].filterOutliers();
       cyls[0].computeAccuracy();
       handleOut(cyls, sample_idx / tot_samples);
       
-      fileo << sample_idx << " " << std::to_string(cyls[0].tmetric.acc()) << std::endl;
+      // fileo << sample_idx << " " << std::to_string(cyls[0].tmetric.acc()) << std::endl;
 
-      auto pointcloud = open3d::geometry::PointCloud(points);
-      paintCloud_cyl(pointcloud, pred_labels);
-      // paintCloud_cyl_NuDL(pointcloud, pred_labels);
-      
-      // auto voxel = open3d::geometry::VoxelGrid::CreateFromPointCloud(pointcloud, 0.05);
-      
-       auto pointcloud_ptr = std::make_shared<open3d::geometry::PointCloud>(pointcloud);
-      // synchro_.addPointCloud(voxel);
-      synchro_.addPointCloud(pointcloud_ptr);
-      
-      cyls[0].updateTriang();
-
-      synchro_.cv.notify_one();
-
-      Eigen::Vector3d      zerov(0.0f, 0.0f, 0.0f);
-
-      if (reset_view) { synchro_.resetView(); reset_view=false; }
-
-      if (visualization_offset>0) {
-        int rem = MAX(0, visualization_offset-bt.elapsedTimeMs());
-        while (rem>0) {
-          std::this_thread::sleep_for(std::chrono::milliseconds(5));
-          synchro_.vis.GetViewControl().SetLookat(zerov);
-          synchro_.vis.GetViewControl().SetConstantZNear(10.0f);
-          rem -= 5;
-          synchro_.cv.notify_one();
-        }
-      }
+      synchro.addPointCloud(dl); // synchro.addPointCloudVoxeled(dl, 0.02f);
+      synchro.addPolarGrid(2, cyls[0].grid);
+      synchro.delay(visualization_offset);
 
     }
 
@@ -158,7 +126,8 @@ int main (int argc, char** argv)
   cyls[0].gmetric.print("final lv 2: ", cyls[2].tot_cells, 1);
 
   
-  synchro_.join();
+  synchro.join();
+
   return 0;
 }
 

@@ -10,11 +10,22 @@ Metric& Metric::operator+=(const Metric& rhs) {
   checkpointTime_ += rhs.checkpointTime_;
   return *this;
 }
+
+
+Metric& Metric::operator=(const Metric& rhs) {
+  tp = rhs.tp; tn = rhs.tn; fp = rhs.fp; fn = rhs.fn; tot= rhs.tot;
+  checkpointTime_ = rhs.checkpointTime_;
+  return *this;
+}
+
+bool Metric::operator>(const Metric& rhs) {
+  return acc()>rhs.acc();
+}
 float Metric::avgTP() const {return tp/(float)(tp+tn+fp+fn);}
 float Metric::avgTN() const {return tn/(float)(tp+tn+fp+fn);}
 float Metric::avgFP() const {return fp/(float)(tp+tn+fp+fn);}
 float Metric::avgFN() const {return fn/(float)(tp+tn+fp+fn);}
-float Metric::acc() const {return (tp+tn)/(float)(tp+tn+fp+fn);}
+float Metric::acc() const {return tot==0 ? 0 : (tp+tn)/(float)(tp+tn+fp+fn);}
 
 void Metric::print(const char *msg, int tot_cells, int tot_workers) const {
   // float iou, f1;
@@ -27,6 +38,36 @@ void Metric::print(const char *msg, int tot_cells, int tot_workers) const {
   std::cout << "         FP:" << std::setw(8) << std::setprecision(4) << avgFP();
   std::cout << " TN:" << std::setw(8) << std::setprecision(4) << avgTN() << std::endl;
   std::cout << "        acc: \033[1;32m" << std::setw(8) << std::setprecision(4) << acc() << "\033[0m";
+  std::cout << " lat: \033[1;35m" << std::setw(5) << (checkpointTime_ ) << "\033[0m ms";
+  std::cout << " lat: \033[1;35m" << std::setw(5) << (checkpointTime_  * tot_cells / tot) << "\033[0m ms";
+  std::cout << std::endl;
+
+  // latex
+  // std::cout << std::endl << std::endl;
+  // std::cout << "& mode & pca & "
+  //           << std::setw(5)<< std::setprecision(4) << acc()*100.0f << " & "
+  //           << std::setw(5)<< std::setprecision(4) << iou*100.0f << " & "
+  //           << std::setw(5)<< std::setprecision(4) << f1*100.0f << " & "
+  //           << std::setw(5)<< std::setprecision(4) << avgFP()*100.0f << " & "
+  //           << std::setw(5)<< std::setprecision(4) << avgTP()*100.0f << " & "
+  //           << std::setw(5)<< std::setprecision(4) << avgFN()*100.0f << " & "
+  //           << std::setw(5)<< std::setprecision(4) << avgTN()*100.0f << std::endl;
+
+
+  // std::cout << std::endl << std::endl;
+}
+
+void Metric::printV(const char *msg, int tot_cells, int tot_workers) const {
+  // float iou, f1;
+  // iou = (float)tp / (tp+fn+fp);
+  // f1 = 2.0f*tp / (2*tp+fn+fp);
+
+  std::cout << std::setw(12) << "\033[1;31m" << msg << "\033[0m" << std::endl;
+  std::cout << "         TP:" << std::setw(8) << std::setprecision(4) << avgTP();
+  std::cout << " FN:" << std::setw(8) << std::setprecision(4) << avgFN() << std::endl;
+  std::cout << "         FP:" << std::setw(8) << std::setprecision(4) << avgFP();
+  std::cout << " TN:" << std::setw(8) << std::setprecision(4) << avgTN() << std::endl;
+  std::cout << "        acc: \033[1;33m" << std::setw(8) << std::setprecision(4) << acc() << "\033[0m";
   std::cout << " lat: \033[1;35m" << std::setw(5) << (checkpointTime_ ) << "\033[0m ms";
   std::cout << " lat: \033[1;35m" << std::setw(5) << (checkpointTime_  * tot_cells / tot) << "\033[0m ms";
   std::cout << std::endl;
@@ -81,6 +122,7 @@ void Metric::log2YAML(float nu, float gamma, float C, int pca, int rows, int tot
   outyaml << YAML::Key << "tp" << YAML::Flow << std::to_string(tp);
   outyaml << YAML::Key << "valid_acc" << YAML::Flow << std::to_string((tp+tn)/(float)tot);
   outyaml << YAML::Key << "valid_latency" << YAML::Flow << std::to_string(checkpointTime_  * tot_cells / tot);
+  outyaml << YAML::Key << "seed" << YAML::Flow << std::to_string(seed);
 
   outyaml << YAML::EndMap;
   out.close();

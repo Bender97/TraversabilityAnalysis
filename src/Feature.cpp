@@ -196,8 +196,32 @@ int Feature::computeFeatures(Cell *cell, Eigen::MatrixXd &scene_normal, std::vec
   d3 = eigensolver.eigenvalues()(2);
 
   // if (d1<1e-8 ||  d2<1e-8 || d3<1e-8) {
-  //   std::cout << "d1 d2 d3\n";
-  //   return 0;
+  //   //  std::cout << "d1 d2 d3\n";
+  // //   return 0;
+  //   linearity = 0;
+  //   planarity = 0;
+  //   sphericity = 0;
+  //   omnivariance = 0;
+  //   anisotropy = 0;
+  //   eigenentropy = 0;
+  //   sum_of_eigenvalues = 0;
+  //   curvature = 0;
+  //   angle = 0;
+  //   goodness_of_fit = 0;
+  //   roughness = 0;
+  //   nvx = 0;
+  //   nvy = 0;
+  //   nvz = 0;
+  //   unevenness = 0;
+  //   surface_density = (float) numpoints / area;
+  //   float min = (points[cell->points_idx[0]])(2), max = (points[cell->points_idx[0]])(2);
+  //   for (auto p_idx : cell->points_idx) {
+  //     p = &(points[p_idx]);
+  //     if ((*p)(2)>max) max = (*p)(2);
+  //     else if ((*p)(2)<min) min = (*p)(2);
+  //   }
+  //   z_diff = max-min;
+  //   return 1;
   // }
 
   if (d1<1e-8)  {
