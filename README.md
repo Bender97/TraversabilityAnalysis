@@ -10,9 +10,9 @@
 
     > refer to https://github.com/jbeder/yaml-cpp
 
- - Open3D
+ - Open3D (tested with Open3D==0.16 (Release))
     
-    > refer to https://github.com/isl-org/Open3D, BUT
+    > refer to https://github.com/isl-org/Open3D/releases/tag/v0.16.0, BUT
     
     > follow these guidelines https://github.com/isl-org/Open3D/issues/2286#issuecomment-765353244
 
@@ -36,6 +36,8 @@
  - First of all we need data, in particular features belonging to cells, to train our models
  - The following will produce the data (in multi-threading setting to speed up the process if frames are numerous)
  > ./produce_data
+
+ - UP TO NOW: produce data only level by level
 
  - then, we can train our models 
 

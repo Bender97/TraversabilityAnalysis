@@ -6,4 +6,5 @@ struct Cell {
   int status; // predictable / unpredictable
   int label;  // ground truth: traversable / not traversable
   float predicted_label; // prediction: traversable / not traversable
+  float area_inverse;
 };

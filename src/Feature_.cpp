@@ -182,29 +182,10 @@ int Feature::ignoreFeatureFromFile(std::ifstream &in, int derived_features_num) 
 
 int Feature::computeFeatures(Cell *cell, Eigen::MatrixXd &scene_normal, std::vector<Eigen::Vector3d> &points) {
   cx = 0; cy = 0; cz = 0;
-  
-  linearity = 0;
-  planarity = 0;
-  sphericity = 0;
-  omnivariance = 0;
-  anisotropy = 0;
-  eigenentropy = 0;
-  sum_of_eigenvalues = 0;
-  curvature = 0;
-  angle = 0;
-  goodness_of_fit = 0;
-  roughness = 0;
-  nvx = 0;
-  nvy = 0;
-  nvz = 0;
-  unevenness = 0;
-  surface_density = 0;
-  z_diff = 0;
-
   numpoints = cell->points_idx.size();
-  numpoints_inverse = 1.0/numpoints;
+  numpoints_inverse = 1.0f/numpoints;
 
-  //double scene_normal_2_inverse = 1.0 / scene_normal(2);
+  float scene_normal_2_inverse = 1.0f / scene_normal(2);
   
   computeCorrelationMatrix(cell->points_idx, points);
 
@@ -232,7 +213,7 @@ int Feature::computeFeatures(Cell *cell, Eigen::MatrixXd &scene_normal, std::vec
   nvy = eigensolver.eigenvectors()(1, 0);
   nvz = eigensolver.eigenvectors()(2, 0);
 
-  double d1_inverse = 1.0 / d1;           // @Optimized
+  float d1_inverse = 1.0f / d1;           // @Optimized
 
   /// COVARIANCE-BASED
   linearity    = (d1 - d2)  * d1_inverse; // @Optimized
@@ -254,9 +235,9 @@ int Feature::computeFeatures(Cell *cell, Eigen::MatrixXd &scene_normal, std::vec
   /// ROUGHNESS-BASED
   angle = std::acos(nvz);    // normal.z = normal.x*0 + normal.y*0 + normal.z*1, with z = (0, 0, 1)
   
-  double min = 10000000, max = -10000000;
+  float min = (points[cell->points_idx[0]])(2), max = (points[cell->points_idx[0]])(2);
 
-  double normal_magnitude_inverse = 1.0 / normal_magnitude;  // @Optimized
+  float normal_magnitude_inverse = 1.0f / normal_magnitude;  // @Optimized
   
   for (auto p_idx : cell->points_idx) {
       p = &(points[p_idx]);
@@ -265,14 +246,20 @@ int Feature::computeFeatures(Cell *cell, Eigen::MatrixXd &scene_normal, std::vec
       
       roughness += NUM2SQ((*p)(2) - cz);
 
-      double z = SCALAR_PRODUCT_2p((*p), scene_normal) * scene_normal(2);
-
+      // float local_d = - SCALAR_PRODUCT_2p(scene_normal, (*p));
+      // float z = - (scene_normal(0)*cx + scene_normal(1)*cy - NUM2SQ(scene_normal(0))/scene_normal(2)*cz
+      //              - NUM2SQ(scene_normal(1))/scene_normal(2)*cz + local_d)
+      //           / (NUM2SQ(scene_normal(0))/scene_normal(2) + NUM2SQ(scene_normal(1))/scene_normal(2) + scene_normal(2));
+      float local_d = - SCALAR_PRODUCT_2p(scene_normal, (*p));
+      float z = - (scene_normal(0)*cx + scene_normal(1)*cy - NUM2SQ(scene_normal(0))*scene_normal_2_inverse*cz
+                   - NUM2SQ(scene_normal(1))*scene_normal_2_inverse*cz + local_d)
+                / (NUM2SQ(scene_normal(0))*scene_normal_2_inverse + NUM2SQ(scene_normal(1))*scene_normal_2_inverse + scene_normal(2));
       if (z>max) max = z;
       else if (z<min) min = z;
   }
   roughness *= numpoints_inverse;
   unevenness = normal_magnitude * numpoints_inverse;
-  surface_density = numpoints / cell->area_inverse;
+  surface_density = numpoints * cell->area_inverse;
 
   /// Z_DIFF feature
   z_diff = max-min;

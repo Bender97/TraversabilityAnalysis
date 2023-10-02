@@ -68,19 +68,21 @@ void Synchro::update() {
   while(spin_flag) {
     // mu.lock(); // maybe unnecessary
 
-    if (!pointclouds_ptr.empty()) {
-      vis.ClearGeometries();
-      vis.AddGeometry(pointclouds_ptr.front(), false);
-      pointclouds_ptr.pop();
-      update_geometry=true;
-    }
+    // if (!pointclouds_ptr.empty()) {
+    //   vis.ClearGeometries();
+    //   auto rr = pointclouds_ptr.front();
+    //   // std::cout << "publishing cloud with " << rr->points_.size() << "\n";
+    //   vis.AddGeometry(pointclouds_ptr.front(), false);
+    //   pointclouds_ptr.pop();
+    //   update_geometry=true;
+    // }
 
-    if (!pointclouds_v_ptr.empty()) {
-      vis.ClearGeometries();
-      vis.AddGeometry(pointclouds_v_ptr.front(), false);
-      pointclouds_v_ptr.pop();
-      update_geometry=true;
-    }
+    // if (!pointclouds_v_ptr.empty()) {
+    //   vis.ClearGeometries();
+    //   vis.AddGeometry(pointclouds_v_ptr.front(), false);
+    //   pointclouds_v_ptr.pop();
+    //   update_geometry=true;
+    // }
 
     if (!polar_grids_ptr.empty()) {
       vis.AddGeometry(polar_grids_ptr.front(), false);
@@ -118,7 +120,8 @@ void Synchro::resetViewFlag(bool reset_view_flag_) {
 
 
 void Synchro::addPointCloud(DataLoader &dl) {
-  pointclouds_ptr.push(dl.getPaintedCloud());
+  // pointclouds_ptr.push(dl.getPaintedCloud());
+  pointclouds_ptr.push(dl.getUniformPaintedCloud());
 }
 
 void Synchro::addPointCloudVoxeled(DataLoader &dl, float voxel_size) {
@@ -127,6 +130,11 @@ void Synchro::addPointCloudVoxeled(DataLoader &dl, float voxel_size) {
 
 void Synchro::addPolarGrid(int level, std::vector<Cell> &grid) {
   updateTriang(level, grid);
+  polar_grids_ptr.push(meshes[level]);
+}
+
+void Synchro::addPolarGridPred(int level, std::vector<Cell> &grid) {
+  updateTriangPred(level, grid);
   polar_grids_ptr.push(meshes[level]);
 }
 
@@ -211,13 +219,18 @@ void Synchro::updateTriang(int level, std::vector<Cell> &grid) {
 
            if (gtlabel==UNKNOWN_CELL_LABEL) color_ = darkgray;
       else if (label>0) {
-        if (label*gtlabel>0) color_ = tp_color;
-        else color_ = fp_color;
+        if (label*gtlabel>0) color_ = white; //tp_color;
+        else color_ = darkorange; //fp_color;
       }
       else {
-        if (label*gtlabel>0) color_ = tn_color;
-        else color_ = fn_color;
-      }                         
+        if (label*gtlabel>0) color_ = red; //tn_color;
+        else color_ = blue; //fn_color;
+      } 
+
+      // else if (label>0) color_ = white; //limegreen;
+      //   else color_ = red; //darkred;    
+      // else if (gtlabel>0) color_ = white; //limegreen;
+      //   else color_ = red; //darkred;                        
 
       // set the color for the cell
       mesh->vertex_colors_[cont ++] = (color_);
@@ -227,7 +240,46 @@ void Synchro::updateTriang(int level, std::vector<Cell> &grid) {
     }
   }
 
-  mesh->ComputeVertexNormals();
+  //mesh->ComputeVertexNormals();
+
+}
+
+void Synchro::updateTriangPred(int level, std::vector<Cell> &grid) {
+  Eigen::Vector3d color_;
+  int idx, gtlabel;
+  float label;
+  int cont=0;
+  int i=0; // TODO:remove dependency on this mechanism. just incremental, better
+          // to do so, just create triangs in another order.
+  auto info = infos[level];
+  auto mesh = meshes[level];
+
+  for (int row_idx = 0; row_idx<info.steps_num; row_idx++) {
+    for (int yaw_idx = 0; yaw_idx<info.yaw_steps; yaw_idx++, i++) {
+
+      idx = ((yaw_idx+info.yaw_steps/2)%info.yaw_steps)*info.steps_num + row_idx;
+      label = grid[idx].predicted_label;
+      gtlabel = grid[idx].label;
+
+      if (gtlabel==UNKNOWN_CELL_LABEL || grid[idx].status==UNPREDICTABLE) color_ = darkgray;
+      else {
+        if (label>0) {
+          color_ = white; //limegreen;
+        }
+        else {
+          color_ = red; //lightred;
+        }                         
+      }
+
+      // set the color for the cell
+      mesh->vertex_colors_[cont ++] = (color_);
+      mesh->vertex_colors_[cont ++] = (color_);
+      mesh->vertex_colors_[cont ++] = (color_);
+      mesh->vertex_colors_[cont ++] = (color_);
+    }
+  }
+
+  //mesh->ComputeVertexNormals();
 
 }
 
@@ -256,5 +308,5 @@ void Synchro::updateTriangGT(int level, std::vector<Cell> &grid) {
     }
   }
 
-  mesh->ComputeVertexNormals();
+  //mesh->ComputeVertexNormals();
 }

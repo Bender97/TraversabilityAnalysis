@@ -55,4 +55,10 @@ enum class ExpMode {produce, DL, test};
 
 #define LABELED_NU(l) ( (l) > 0 )
 
+#define LABELED_PANDASET(l) ( (l) > 4 )
+#define POINTBELONGSTOROAD_PANDASET(l) ( (l)>=7 && (l)<=12 )
+
+#define ISROAD_PANDASET(l) ( (l) == 7 )
+#define ISOTHERTRAV_PANDASET(l) ( (l)>=8 && (l)<=12 )
+
 #endif

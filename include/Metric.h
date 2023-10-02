@@ -9,6 +9,7 @@
 class Metric {
 public:
   uint64_t tp, tn, fp, fn, tot;
+  float iouT, iouF, f1, cohen;
   cv_ext::BasicTimer bt;
   uint64_t checkpointTime_;
   uint16_t seed;
@@ -28,10 +29,11 @@ public:
   void resetAcc();
   void resetAll();
   void checkpointTime();
+  void compute();
 
   void log2YAML(float nu, float gamma, float C, int pca, int row, int tot_cells, std::string folderpath);
 
-  void print(const char *msg, int tot_cells=1, int tot_workers=1) const;
+  void print(std::string msg, int tot_cells=1, int tot_workers=1);
   void printV(const char *msg, int tot_cells=1, int tot_workers=1) const;
   void printLight(const char *msg, int tot_cells=1, int tot_workers=1) const;
   std::string getresults() const;

@@ -13,7 +13,8 @@ class Normalizer {
 
 public:
 
-    std::vector<float> min, max, p2p, avg, var;
+    // std::vector<float> min, max, p2p, avg, var;
+    std::vector<double> avg, var, var_inv;
     int tot_geom_features;
 
     void init(int tot_geom_features_);

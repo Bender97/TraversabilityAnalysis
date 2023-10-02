@@ -7,6 +7,7 @@ Eigen::Vector3d limegreen(0.19f, 0.8f, 0.19f);
 ColorUtil::ColorUtil() {}
 ColorUtil_SemKITTI::ColorUtil_SemKITTI() : ColorUtil() {load_colors();}
 ColorUtil_NuSC::ColorUtil_NuSC() : ColorUtil() {load_colors();}
+ColorUtil_PandaSet::ColorUtil_PandaSet() : ColorUtil() {load_colors();}
 
 void ColorUtil::load_colors() {}
 
@@ -46,6 +47,53 @@ void ColorUtil_SemKITTI::load_colors() {
   colors[257].r = 250; colors[257].g = 80; colors[257].b = 100;  // "moving-bus"
   colors[258].r = 180; colors[258].g = 30; colors[258].b = 80;   // "moving-truck"
   colors[259].r = 255; colors[259].g = 0; colors[259].b = 0;     // "moving-other-vehicle"
+}
+
+void ColorUtil_PandaSet::load_colors() {
+  colors = std::vector<Color>(43);
+  colors[0].r =  0;  colors[0].g = 0; colors[0].b = 0;        // "unlabeled"
+  colors[1].r =  0;  colors[1].g = 0; colors[1].b = 255;      // Smoke -> "outlier"
+  colors[2].r =  0;  colors[2].g = 0; colors[2].b = 255;      // Exhaust -> "outlier"
+  colors[3].r =  0;  colors[3].g = 0; colors[3].b = 255;      // Spray or rain -> "outlier"
+  colors[4].r =  0;  colors[4].g = 0; colors[4].b = 255;      // Reflection -> "outlier"
+  colors[5].r = 0;   colors[5].g = 175; colors[5].b = 0;      // "vegetation"
+  colors[6].r = 75;  colors[6].g = 0; colors[6].b = 175;     // Ground -> "other-ground"
+  colors[7].r = 255; colors[7].g = 0; colors[7].b = 255;    // "road"                                          X
+  colors[8].r = 170; colors[8].g = 255; colors[8].b = 150;  // "Lane Line Marking" -> lane-marking             X
+  colors[9].r = 170; colors[9].g = 255; colors[9].b = 150;  // "Stop Line Marking" -> lane-marking             X
+  colors[10].r = 170; colors[10].g = 255; colors[10].b = 150;  // "Other Road Marking" -> lane-marking         X
+  colors[11].r = 75;  colors[11].g = 0; colors[11].b = 75;      // "sidewalk"                                  X
+  colors[12].r = 75;  colors[12].g = 0; colors[12].b = 75;      // Driveway -> "sidewalk"                      X
+  colors[13].r = 245; colors[13].g = 150; colors[13].b = 100;  // "car"
+  colors[14].r = 245; colors[14].g = 150; colors[14].b = 100;  // Pickup Truck -> "car"
+  colors[15].r = 180; colors[15].g = 30; colors[15].b = 80;    // Medium-sized Truck -> "truck"
+  colors[16].r = 180; colors[16].g = 30; colors[16].b = 80;    // Semi-truck -> "truck"
+  colors[17].r = 255; colors[17].g = 0; colors[17].b = 0;      // Towed Object -> "other-vehicle"
+  colors[18].r = 150; colors[18].g = 60; colors[18].b = 30;    // "motorcycle"
+  colors[19].r = 255; colors[19].g = 0; colors[19].b = 0;      // Other Vehicle - Construction Vehicle ->"other-vehicle"
+  colors[20].r = 255; colors[20].g = 0; colors[20].b = 0;      // Other Vehicle - Uncommon -> "other-vehicle"
+  colors[21].r = 255; colors[21].g = 0; colors[21].b = 0;      // Other Vehicle - Pedicab -> "other-vehicle"
+  colors[22].r = 245; colors[22].g = 150; colors[22].b = 100;  // Emergency Vehicle -> "car"
+  colors[23].r = 180; colors[23].g = 30; colors[23].b = 80;    // Bus -> "truck"
+  colors[24].r = 245; colors[24].g = 230; colors[24].b = 100;  // Personal Mobility Device -> "bicycle"
+  colors[25].r = 150; colors[25].g = 60; colors[25].b = 30;    // Motorized Scooter -> "motorcycle"
+  colors[26].r = 245; colors[26].g = 230; colors[26].b = 100;  // "bicycle"
+  colors[27].r = 255; colors[27].g = 0; colors[27].b = 0;      // Train -> "other-vehicle"
+  colors[28].r = 255; colors[28].g = 0; colors[28].b = 0;      // Trolley -> "other-vehicle"
+  colors[29].r = 255; colors[29].g = 0; colors[29].b = 0;      // Tram / Subway -> "other-vehicle"
+  colors[30].r = 30;  colors[30].g = 30; colors[30].b = 255;    // Pedestrian -> "person"
+  colors[31].r = 30;  colors[31].g = 30; colors[31].b = 255;    // Pedestrian with Object -> "person"
+  colors[32].r = 30;  colors[32].g = 30; colors[32].b = 255;    // Animals - Bird -> "person"
+  colors[33].r = 30;  colors[33].g = 30; colors[33].b = 255;    // Animals - Other -> "person"
+  colors[34].r = 150; colors[34].g = 240; colors[34].b = 255;  // Pylons -> "pole"
+  colors[35].r = 50;  colors[35].g = 120; colors[35].b = 255;   // Road Barriers -> "fence"
+  colors[36].r = 0;   colors[36].g = 0; colors[36].b = 255;      // Signs -> "traffic-sign"
+  colors[37].r = 0;   colors[37].g = 0; colors[37].b = 255;      // Cones -> "traffic-sign"
+  colors[38].r = 0;   colors[38].g = 0; colors[38].b = 255;      // Construction Signs -> "traffic-sign"
+  colors[39].r = 50;  colors[39].g = 120; colors[39].b = 255;   // Temporary Construction Barriers -> "fence"
+  colors[40].r = 255; colors[40].g = 255; colors[40].b = 50;   // Rolling Containers -> "other-object"
+  colors[41].r = 0;   colors[41].g = 200; colors[41].b = 255;    // "building"
+  colors[42].r = 255; colors[42].g = 255; colors[42].b = 50;   // Other Static Object -> "other-object"
 }
 
 void ColorUtil_NuSC::load_colors() {

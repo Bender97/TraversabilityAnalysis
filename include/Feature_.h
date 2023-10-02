@@ -27,9 +27,8 @@ class Feature {
     float surface_density;
     float z_diff;
 
-    double cx, cy, cz, d1, d2, d3, d, normal_magnitude, numpoints;
-    double numpoints_inverse;
-    double a11, a12, a13, a22, a23, a33, ax, ay, az;
+    float cx, cy, cz, d1, d2, d3, d, normal_magnitude, numpoints, numpoints_inverse;
+    float a11, a12, a13, a22, a23, a33, ax, ay, az;
 
     Eigen::MatrixXd matA1;
     Eigen::Vector3d *p;

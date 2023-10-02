@@ -30,39 +30,56 @@ static int barWidth = 70;
 static bool already_written = false, threadPrint_continue_flag=true;
 static std::stringstream ss;
 
+std::string dataset_name, dataset_path;
+
 std::mutex mu, mu2;
 std::condition_variable cond_var;
 std::vector<int> seqs;
+int producing_level;
 
 template<typename T>
 void loadCyls(std::vector<T*> &cyls, YAML::Node &sample_data, bool verbose=false) {
   cyls.clear();
   int level;
 
-  std::string data_ = sample_data["general"]["dataset"].as<std::string>();
-
   if (verbose) {
-    std::cout << "DATA: " << data_ << std::endl;
+    std::cout << "DATA: " << dataset_name << std::endl;
     std::cout << "#######################################" << std::endl;
   }
-  for (level=0; ; level++) {
+  for (level=0; level<=producing_level; level++) {
     auto cyl_s = std::string("cyl") + std::string(2 - MIN(2, std::to_string(level).length()), '0') + std::to_string(level);
     YAML::Node node = sample_data["general"][cyl_s.c_str()];
     if (!node) break;
 
-    node["dataset"] = data_;
+    node["dataset"] = dataset_name;
     node["load_path"] = sample_data["general"]["load_path"].as<std::string>();
     node["save_path"] = sample_data["general"]["save_path"].as<std::string>();
+
     node["store_features_filename"] = sample_data["general"]["store_features_filename"].as<std::string>();
     
     T *back_cyl = (level>0) ? (cyls[level-1]) : nullptr;
     
-    if (data_=="SemKITTI") {
-      std::cout << "creating cyl at level " << level << std::endl;
+    if (dataset_name=="SemKITTI") {
+      std::cout << "\033[1;33mcreating cyl at level " << level << "\033[0m  | ";
       Cylinder_SemKITTI *cyl;
-      if (level<2) cyl = new Cylinder_SemKITTI(node, back_cyl, ExpMode::test); 
+      if (level<producing_level) cyl = new Cylinder_SemKITTI(node, back_cyl, ExpMode::test); 
       else cyl = new Cylinder_SemKITTI(node, back_cyl, ExpMode::produce); 
-      // auto cyl = new Cylinder_SemKITTI(node, back_cyl, ExpMode::produce); 
+      if (verbose) cyl->printSummary();   
+      cyls.push_back(cyl);
+    }
+    else if (dataset_name=="nuScenes") {
+      std::cout << "\033[1;33mcreating cyl at level " << level << "\033[0m  | ";
+      Cylinder_NuSc *cyl;
+      if (level<producing_level) cyl = new Cylinder_NuSc(node, back_cyl, ExpMode::test); 
+      else cyl = new Cylinder_NuSc(node, back_cyl, ExpMode::produce); 
+      if (verbose) cyl->printSummary();   
+      cyls.push_back(cyl);
+    }
+    else if (dataset_name=="PandaSet") {
+      std::cout << "\033[1;33mcreating cyl at level " << level << "\033[0m  | ";
+      Cylinder_PandaSet *cyl;
+      if (level<producing_level) cyl = new Cylinder_PandaSet(node, back_cyl, ExpMode::test); 
+      else cyl = new Cylinder_PandaSet(node, back_cyl, ExpMode::produce); 
       if (verbose) cyl->printSummary();   
       cyls.push_back(cyl);
     }
@@ -123,13 +140,15 @@ void produceFeatures(int thread_idx, int start, int end, std::vector<Pair> &pair
   sample_data["general"]["store_features_filename"] = temp;
   mu2.unlock();
   
-  DataLoader_SemKITTI dl;
-  int tot = end - start;
-  
-  // for (auto &seq : seqs) {
-  //   seq_stat[thread_idx] = seq;
+  DataLoader *dl;
+  if (dataset_name=="SemKITTI")
+    dl = new DataLoader_SemKITTI(dataset_path);
+  else if (dataset_name=="nuScenes")
+    dl = new DataLoader_NuSc(dataset_path);
+  else if (dataset_name=="PandaSet")
+    dl = new DataLoader_PandaSet(dataset_path);
 
-  //   for (int sample_idx=start; sample_idx < end; sample_idx++) {
+  int tot = end - start;
   
   Pair pair;
   int seq, sample_idx;
@@ -142,35 +161,34 @@ void produceFeatures(int thread_idx, int start, int end, std::vector<Pair> &pair
     seq_stat[thread_idx] = seq;
     progress[thread_idx] = (float)(i+1-start) / tot;
     mu2.lock();
-    dl.readData(seq, sample_idx, sample_data);
+    dl->readData(seq, sample_idx, sample_data);
     mu2.unlock();
-    if (dl.scene_normal.isZero()) continue;
+    if (dl->scene_normal.isZero()) continue;
 
     for (size_t a=0; a<cyls.size(); a++) 
-      cyls[a]->produceFeaturesRoutine(dl, (!a) ? nullptr : cyls[a-1]);
+      cyls[a]->produceFeaturesRoutine(*dl, (!a) ? nullptr : cyls[a-1]);
 
     cond_var.notify_one();
   }
+  free(dl);
 }
+
 int count_samples(YAML::Node &sample_data, int seq) {
-
-  auto seq_s = std::string(2 - MIN(2, std::to_string(seq).length()), '0') + std::to_string(seq);
-  std::string path = sample_data["general"]["dataset_path"].as<std::string>()
-                    +"sequences/"+seq_s+"/labels/";
-
-  int fileCount = 0;
-  DIR *dp;
-  struct dirent *ep;     
-  dp = opendir (path.c_str());
-  if (dp != NULL) {
-    while ((ep = readdir (dp))) fileCount++;
-    (void) closedir (dp);
+  std::string path = dataset_path;
+  if (dataset_name=="SemKITTI") {
+    auto seq_s = std::string(2 - MIN(2, std::to_string(seq).length()), '0') + std::to_string(seq);
+    path = path+"sequences/"+seq_s+"/labels/";
   }
-  else {
-    std::cout << path << std::endl; 
-    perror ("Couldn't open the directory");
-  }
-  return fileCount;
+
+  DataLoader *dl;
+  if (dataset_name=="SemKITTI")
+    dl = new DataLoader_SemKITTI(dataset_path);
+  else if (dataset_name=="nuScenes")
+    dl = new DataLoader_NuSc(dataset_path);
+  else if (dataset_name=="PandaSet")
+    dl = new DataLoader_PandaSet(dataset_path);
+
+  return dl->count_samples(seq);
 }
 
 
@@ -178,25 +196,30 @@ int main (int argc, char** argv) {
   
   seqs = sample_data["mtthread"]["sequences"].as<std::vector<int>>();
   tot_pools = sample_data["mtthread"]["tot_pools"].as<int>();
+  producing_level = sample_data["general"]["producing_level"].as<int>();
+
+  dataset_name = sample_data["general"]["dataset"].as<std::string>();
+  if (dataset_name=="SemKITTI")
+    dataset_path = sample_data["general"]["SemKITTI_dataset_path"].as<std::string>();
+  else if (dataset_name=="nuScenes")
+    dataset_path = sample_data["general"]["nuScenes_path"].as<std::string>();
+  else if (dataset_name=="PandaSet")
+    dataset_path = sample_data["general"]["PandaSet_dataset_path"].as<std::string>();
+
   int sample_idx_start, sample_idx_end; 
-
-
-  std::vector<Cylinder_SemKITTI *> cyls;
-  loadCyls(cyls, sample_data, true);
   
-  // if (sample_data["mtthread"]["sample_idx_start"]) sample_idx_start = sample_data["mtthread"]["sample_idx_start"].as<int>();
-  // else throw std::runtime_error(std::string("\033[1;31mERROR\033[0m. Please provide sample_idx_start!\n"));
-  // if (sample_data["mtthread"]["sample_idx_end"])   sample_idx_end   = sample_data["mtthread"]["sample_idx_end"].as<int>();
-  // else throw std::runtime_error(std::string("\033[1;31mERROR\033[0m. Please provide sample_idx_end!\n"));
+  std::vector<Cylinder *> cyls;
+  std::cout << "creating cyls for later use\n";
+  loadCyls(cyls, sample_data, true);
+  std::cout << "-------------- finished --------------\n";
+
+  std::cout << cyls[producing_level]->store_features_filename << std::endl;
 
   std::thread workerThread(threadPrint);
 
   progress = MALLOC_(float, tot_pools);
-  stat = MALLOC_(int, tot_pools);
+  stat     = MALLOC_(int, tot_pools);
   seq_stat = MALLOC_(int, tot_pools);
-
-  // int step = (int)std::ceil((float)(sample_idx_end-sample_idx_start)/tot_pools);
-  // std::cout << "start: " << sample_idx_start << " end: " << sample_idx_end << " step: " << step << std::endl;
 
   std::vector<Pair> pairs;
   for (auto seq: seqs) {
@@ -220,7 +243,6 @@ int main (int argc, char** argv) {
 
     int thread_idx = i;
 
-    // std::cout << "starting test pool [" << i << "] from " << start << " to " << end << std::endl;
     ts[i] = std::thread(produceFeatures, thread_idx, start, end, std::ref(pairs));
   }
 
@@ -230,9 +252,11 @@ int main (int argc, char** argv) {
   cond_var.notify_one();
   workerThread.join();
 
-  free(progress);
-  free(stat);
-  free(seq_stat);
+  // free(progress);
+  // free(stat);
+  // free(seq_stat);
+
+  // return 0;
 
 
   //////////////////////////////////////////////////////////////////
@@ -241,36 +265,33 @@ int main (int argc, char** argv) {
   int BUFFER_SIZE = 20000;
   char buffer[BUFFER_SIZE];
 
-  for (int level=0; level<(int)cyls.size(); level++) {
-    // prepare command statement
-    std::string cat_cmd = "cat";
-    std::string  rm_cmd = "rm ";
+  // prepare command statement
+  std::string cat_cmd = "cat";
+  std::string  rm_cmd = "rm ";
 
-    std::string name = cyls[level]->store_features_filename;
-    name.erase(name.length()-5); // remove "{LEVEL}.bin" // ASSUMING 0<LEVEL<10
-    for (int thread_idx=0; thread_idx<tot_pools; thread_idx++) {
-      
-      cat_cmd += std::string(" ") + name + std::string("_") + std::to_string(thread_idx) + std::to_string(level) + ".bin";
-       rm_cmd += std::string(" ") + name + std::string("_") + std::to_string(thread_idx) + std::to_string(level) + ".bin";
-    }
-    cat_cmd += std::string(" > ") + cyls[level]->store_features_filename;
+  std::string name = cyls[producing_level]->store_features_filename;
+  name.erase(name.length()-5); // remove "{LEVEL}.bin" // ASSUMING 0<LEVEL<10
+  for (int thread_idx=0; thread_idx<tot_pools; thread_idx++) {
+    
+    cat_cmd += std::string(" ") + name + std::string("_") + std::to_string(thread_idx) + std::to_string(producing_level) + ".bin";
+      rm_cmd += std::string(" ") + name + std::string("_") + std::to_string(thread_idx) + std::to_string(producing_level) + ".bin";
+  }
+  cat_cmd += std::string(" > ") + cyls[producing_level]->store_features_filename;
 
-    // execute cat (merge all temp file into one)
-    fp = popen(cat_cmd.c_str(), "r");
-    if (fp != NULL) {
-        while (fgets(buffer, BUFFER_SIZE, fp) != NULL)
-            printf("%s", buffer);
-        pclose(fp);
-    }
+  // execute cat (merge all temp file into one)
+  fp = popen(cat_cmd.c_str(), "r");
+  if (fp != NULL) {
+      while (fgets(buffer, BUFFER_SIZE, fp) != NULL)
+          printf("%s", buffer);
+      pclose(fp);
+  }
 
-    // execute rm (remove temp files)
-    fp = popen( rm_cmd.c_str(), "r");
-    if (fp != NULL) {
-        while (fgets(buffer, BUFFER_SIZE, fp) != NULL)
-            printf("%s", buffer);
-        pclose(fp);
-    }
-
+  // execute rm (remove temp files)
+  fp = popen( rm_cmd.c_str(), "r");
+  if (fp != NULL) {
+      while (fgets(buffer, BUFFER_SIZE, fp) != NULL)
+          printf("%s", buffer);
+      pclose(fp);
   }
 
   return 0;

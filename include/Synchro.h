@@ -31,6 +31,7 @@ class Synchro {
 protected:
   void createTriangs();
   void updateTriang(int level, std::vector<Cell> &grid);
+  void updateTriangPred(int level, std::vector<Cell> &grid);
   void updateTriangGT(int level, std::vector<Cell> &grid);
 
 public:
@@ -61,6 +62,7 @@ public:
   void addPointCloud(DataLoader &dl);
   void addPointCloudVoxeled(DataLoader &dl, float voxel_size);
   void addPolarGrid (int level, std::vector<Cell> &grid);
+  void addPolarGridPred (int level, std::vector<Cell> &grid);
   void delay(int vis_offset);
   void join();
 

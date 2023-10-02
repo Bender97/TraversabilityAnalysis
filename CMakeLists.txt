@@ -7,16 +7,31 @@ set(CMAKE_BUILD_TYPE "Release")
 set(CMAKE_CXX_FLAGS "-std=c++14")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -Wall -g -pthread")
 
-set(COMPILE_MODE "compile_basic")
+#set(COMPILE_MODE "compile_basic")
 
+option(OPEN3D "Compile with Open3D flag" 1)
+if (OPEN3D)
+add_definitions(-DOPEN3D=1)
+else()
+add_definitions(-DOPEN3D=0)
+endif()
 
-
-# Find installed Open3D, which exports Open3D::Open3D
 find_package(OpenCV REQUIRED )
 
 # Find Eigen3
 find_package(Eigen3 REQUIRED)
-find_package(Open3D REQUIRED)
+
+if(OPEN3D)
+	# Find installed Open3D, which exports Open3D::Open3D
+	find_package(Open3D REQUIRED)
+	SET (open3d_lib Open3D::Open3D)
+	message("OPEN3D IS 1")
+else()
+	SET (open3d_lib "")
+	message("OPEN3D IS ZERO")
+endif()
+
+
 
 find_package(yaml-cpp REQUIRED)
 
@@ -38,12 +53,18 @@ ADD_LIBRARY(color_util
 ADD_LIBRARY(dataloader
 	include/DataLoader.h src/DataLoader.cpp
 )
-target_link_libraries(dataloader color_util yaml-cpp Open3D::Open3D)
+target_link_libraries(dataloader color_util yaml-cpp ${open3d_lib})
 
-ADD_LIBRARY(synchro
-	include/Synchro.h src/Synchro.cpp
-)
-target_link_libraries(synchro dataloader yaml-cpp Open3D::Open3D)
+if(OPEN3D)
+	ADD_LIBRARY(synchro
+		include/Synchro.h src/Synchro.cpp
+	)
+	target_link_libraries(synchro dataloader yaml-cpp ${open3d_lib})
+	set(synchro_lib synchro)
+else()
+	set(synchro_lib "")
+endif()
+
 
 ADD_LIBRARY(metric
 	include/Metric.h src/Metric.cpp
@@ -76,20 +97,24 @@ ADD_LIBRARY(traindataset
 )
 target_link_libraries(traindataset yaml-cpp ${OpenCV_LIBS} feature normalizer metric cylinder )
 
-SET (custom_libs cylinder feature normalizer color_util yaml-cpp metric results dataloader synchro)
+SET (custom_libs cylinder feature normalizer color_util yaml-cpp metric results dataloader ${synchro_lib})
 
 
 
-# Produce Feature
+# # Produce Feature
 add_executable(mtmain src/mtmain.cpp)
 target_link_libraries(mtmain ${custom_libs} ${OpenCV_LIBS} )
-#
+
 # Train
 add_executable(train src/train.cpp)
 target_link_libraries(train ${custom_libs} traindataset ${OpenCV_LIBS} )
-# Test
+
+# # Test
 add_executable(test src/try_cyl.cpp)
 target_link_libraries(test  ${custom_libs})
 
 add_executable(test_dl src/test_labels.cpp)
 target_link_libraries(test_dl ${custom_libs} )
+
+add_executable(processSingleCloud src/processSingleCloud.cpp)
+target_link_libraries(processSingleCloud ${custom_libs} )

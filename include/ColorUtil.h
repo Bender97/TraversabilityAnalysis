@@ -31,6 +31,14 @@ public:
   ColorUtil_SemKITTI();
 };
 
+class ColorUtil_PandaSet : public ColorUtil {
+protected:
+  void load_colors();
+
+public:
+  ColorUtil_PandaSet();
+};
+
 class ColorUtil_NuSC : public ColorUtil {
 protected:
   void load_colors();

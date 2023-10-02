@@ -20,9 +20,10 @@
 
 #include <sstream>
 
-class TrainDataset : public Cylinder {
+class Dataset4 : public Cylinder {
 public:
   cv::Mat X_train, y_train;
+  cv::Mat fullX, fullY;
 
   int num_entries_to_train_on;
   int counters[2];
@@ -30,7 +31,7 @@ public:
   std::vector<float> nu_vec, C_vec, gamma_vec;
 
   int ref_label_idx;
-  uint16_t seed;
+  int32_t seed;
 
   std::vector<bool> taken;
 
@@ -41,17 +42,43 @@ public:
 
   std::vector<int> sampled_idxs;
 
-  TrainDataset(YAML::Node &node_cyl, int level_, bool train_flag);
-  TrainDataset(YAML::Node &node_cyl, int level_, Normalizer &normalizer_, cv::PCA &pca_, bool train_flag);
+  Dataset4();
+  Dataset4(YAML::Node &node_cyl, int level_);
+  Dataset4(YAML::Node &node_cyl, int level_, Normalizer &normalizer_, cv::PCA &pca_);
   void load();
-  void init(YAML::Node &node_cyl, int level_, bool train_flag=true);
+  virtual void parseYAMLConfig(YAML::Node &node_cyl, int level_);
   void summary();
+
+  void createPCAOnAll();
 
   void readLabels();
   void loadData();
-  void sampleIdxs();
-  void sampleIdxs_ContextBased();
+  virtual void sampleIdxs();
   void checkFileAndConfigAreValid(int feats_size, int tot_entries, int cont_trav, int cont_nontrav);
+};
+
+class Dataset4Train : public Dataset4 {
+public:
+  Dataset4Train();
+  Dataset4Train(YAML::Node &node_cyl, int level_);
+  void parseYAMLConfig(YAML::Node &node_cyl, int level_);
+  void sampleIdxs();
+};
+
+class Dataset4Valid : public Dataset4 {
+public:
+  Dataset4Valid();
+  Dataset4Valid(YAML::Node &node_cyl, int level_, Normalizer &normalizer_, cv::PCA &pca_);
+  void parseYAMLConfig(YAML::Node &node_cyl, int level_);
+  void sampleIdxs();
+};
+
+class Dataset4Test : public Dataset4 {
+public:
+  Dataset4Test();
+  Dataset4Test(YAML::Node &node_cyl, int level_, Normalizer &normalizer_, cv::PCA &pca_);
+  void parseYAMLConfig(YAML::Node &node_cyl, int level_);
+  void sampleIdxs();
 };
 
 #endif // TRAINDATASET_H

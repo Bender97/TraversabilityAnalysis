@@ -21,23 +21,32 @@ Metric& Metric::operator=(const Metric& rhs) {
 bool Metric::operator>(const Metric& rhs) {
   return acc()>rhs.acc();
 }
-float Metric::avgTP() const {return tp/(float)(tp+tn+fp+fn);}
-float Metric::avgTN() const {return tn/(float)(tp+tn+fp+fn);}
-float Metric::avgFP() const {return fp/(float)(tp+tn+fp+fn);}
-float Metric::avgFN() const {return fn/(float)(tp+tn+fp+fn);}
-float Metric::acc() const {return tot==0 ? 0 : (tp+tn)/(float)(tp+tn+fp+fn);}
+float Metric::avgTP() const {return (double)tp/(double)(tot);}
+float Metric::avgTN() const {return (double)tn/(double)(tot);}
+float Metric::avgFP() const {return (double)fp/(double)(tot);}
+float Metric::avgFN() const {return (double)fn/(double)(tot);}
+float Metric::acc() const {return tot==0 ? 0 : (double)(tp+tn)/(double)(tot);}
+void Metric::compute() {
+  iouT = (double)tp / (tp + fn + fp);
+  iouF = (double)tn / (tn + fn + fp);
+  f1 = 2.0f*avgTP() / (2.0f*avgTP()+avgFN()+avgFP());
+  cohen = 2.0f * (avgTP() * avgTN() -avgFN()*avgFP()) / 
+          ( (avgTP() + avgFP())*(avgFP() + avgTN()) + (avgTP() + avgFN())*(avgFN() + avgTN()) );
+}
 
-void Metric::print(const char *msg, int tot_cells, int tot_workers) const {
-  // float iou, f1;
-  // iou = (float)tp / (tp+fn+fp);
-  // f1 = 2.0f*tp / (2*tp+fn+fp);
-
+void Metric::print(std:: string msg, int tot_cells, int tot_workers) {
+  compute();
   std::cout << std::setw(12) << "\033[1;31m" << msg << "\033[0m" << std::endl;
   std::cout << "         TP:" << std::setw(8) << std::setprecision(4) << avgTP();
   std::cout << " FN:" << std::setw(8) << std::setprecision(4) << avgFN() << std::endl;
   std::cout << "         FP:" << std::setw(8) << std::setprecision(4) << avgFP();
   std::cout << " TN:" << std::setw(8) << std::setprecision(4) << avgTN() << std::endl;
   std::cout << "        acc: \033[1;32m" << std::setw(8) << std::setprecision(4) << acc() << "\033[0m";
+  std::cout << " iouT:" << std::setw(8) << std::setprecision(3) << iouT << std::endl;
+  std::cout << " iouF:" << std::setw(8) << std::setprecision(3) << iouF << std::endl;
+  std::cout << " f1:" << std::setw(8) << std::setprecision(3) << f1 << std::endl;
+  std::cout << " cohen:" << std::setw(8) << std::setprecision(3) << cohen << std::endl;
+
   std::cout << " lat: \033[1;35m" << std::setw(5) << (checkpointTime_ ) << "\033[0m ms";
   std::cout << " lat: \033[1;35m" << std::setw(5) << (checkpointTime_  * tot_cells / tot) << "\033[0m ms";
   std::cout << std::endl;
