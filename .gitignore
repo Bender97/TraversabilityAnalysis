@@ -48,9 +48,10 @@ Thumbs.db
 *.mov
 *.wmv
 
+
 .idea/**
-build/
 data/
 logs/
+build/
 
 **/cmake-build-debug/**

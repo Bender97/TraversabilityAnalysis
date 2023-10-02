@@ -1,0 +1,109 @@
+tot_geom_features: 17
+
+general:
+  split:
+    train: [0, 1, 2, 3, 4, 5, 6, 7, 9, 10]
+    valid: [8]
+    test: [8]
+
+  dataset: "SemKITTI"
+  # dataset: "nuScenes"
+  # dataset: "PandaSet"
+
+  train_level: 2
+  producing_level: 2
+
+  vis_offset: 0
+  sample_idx_start:  0
+  sample_idx_end: 4071
+
+  SemKITTI_dataset_path: "/media/fusy/Windows-SSD/Users/orasu/Desktop/SemanticKittiDataset/data_odometry_velodyne/dataset/"
+  PandaSet_dataset_path: "/media/fusy/data_SSD/pandaset_parsed_withremission2/"
+  nuScenes_path: "/home/fusy/repos/code2_paper/code3/build/recipe.txt"
+  
+  # predicted_path: "/home/fusy/repos/trav_analysis_2_coarse2fine/biclass_3/biclass_3/tmp08/"                      #cyl3d
+  # predicted_path: "/home/fusy/repos/trav_analysis_2_coarse2fine/out_cyl_3_labels/test/sequences/08/predictions/"   #pvkd
+  predicted_path: "/home/fusy/repos/trav_analysis_2_coarse2fine/3_labels_pred/sequences/08/predictions"            #rangenet
+  # predicted_path: "/media/fusy/data_SSD/out_pandaset_cyl3d_4labels/"                             #cyl3d
+  # predicted_path: "/media/fusy/data_SSD/out_pvkd3_pandaset_4labels/out_pvkd3_pandaset/"                #pvkd
+  # predicted_path: "/media/fusy/data_SSD/predictions_rangenet_on_pandaset_4labels/loggaa2/sequences/02/predictions/"  #rangenet++
+  # predicted_path: "/home/fusy/repos/code2_paper/code2/DL_data/out_pandaset2/"   #cyl3d
+  # predicted_path: "/home/fusy/repos/trav_analysis_2_coarse2fine/nures/"
+
+  load_path: "../models/results00/"
+  save_path: "../models/results00/"
+  store_features_filename: "features_data_4p"
+
+  seed: 21415
+  iters:  [5000, 5500, 6000, 6500, 6750, 7000, 7250, 7500, 7750, 8000]
+
+  cyl00:
+    min_radius: 3.0
+    max_radius: 40.0
+    steps_num: 8
+    yaw_steps: 16
+    z_level: -5 # for visualization
+    mode: 3
+    pca: 17
+    trick: 0
+    nu: 0.1921
+    gamma: 0.0843
+    iters: 5000
+    train:
+      feats_to_sample: 50000
+      balance_flag: false
+      nu_vec: [0.2027, 0.2028, 0.2029]
+      gamma_vec: [0.097, 0.098, 0.099, 0.1]
+      C_vec: [1.0]
+    valid:
+      feats_to_sample: -1
+      balance_flag: false
+
+  cyl01:
+    min_radius: 3.0
+    max_radius: 40.0
+    steps_num: 16
+    yaw_steps: 32
+    z_level: 2
+    mode: 4
+    pca: 17
+    trick: 0
+    nu: 0.1944
+    gamma: 0.0689
+    iters: 7500
+    train:
+      feats_to_sample: 50000
+      balance_flag: false
+      nu_vec: [0.1, 0.19, 0.2, 0.21, 0.22, 0.225, 0.25, 0.275, 0.3]
+      gamma_vec: [0.07, 0.08, 0.09, 0.105, 0.11, 0.12, 0.13, 0.15, 0.2]
+      C_vec: [1.0]
+    valid:
+      feats_to_sample: -1
+      balance_flag: false
+
+  cyl02:
+    min_radius: 3.0
+    max_radius: 40.0
+    steps_num: 64
+    yaw_steps: 128
+    z_level: -1.5
+    mode: 4
+    pca: 17
+    trick: 0
+    nu: 0.2009
+    gamma: 0.0893
+    iters: 7500
+    train:
+      feats_to_sample: 48000
+      balance_flag: false
+      nu_vec: [0.23]
+      gamma_vec: [0.07]
+      C_vec: [1.0]
+    valid:
+      feats_to_sample: -1
+      balance_flag: false 
+
+mtthread:
+  sequences: [0, 1, 2, 3, 4, 5, 6, 7, 9, 10]
+  tot_pools: 1
+  tot_geom_features: 17

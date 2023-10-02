@@ -19,7 +19,7 @@
 using namespace std::chrono_literals;
 
 
-YAML::Node sample_data = YAML::LoadFile("test.yaml");
+YAML::Node sample_data = YAML::LoadFile("../models/test.yaml");
 
 #if OPEN3D 
 Synchro synchro(sample_data, true);

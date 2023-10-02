@@ -17,7 +17,7 @@
 
 using namespace std::chrono_literals;
 
-YAML::Node sample_data = YAML::LoadFile("test.yaml");
+YAML::Node sample_data = YAML::LoadFile("../models/test.yaml");
 
 std::vector<Eigen::Vector3d> points;
 std::vector<int> labels;

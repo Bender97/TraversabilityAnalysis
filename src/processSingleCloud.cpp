@@ -19,7 +19,7 @@
 using namespace std::chrono_literals;
 
 
-YAML::Node sample_data = YAML::LoadFile("test.yaml");
+YAML::Node sample_data = YAML::LoadFile("../models/test.yaml");
 cv_ext::BasicTimer bt;
 
 std::vector<Cylinder*> cyls;

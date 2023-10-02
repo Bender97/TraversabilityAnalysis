@@ -41,7 +41,7 @@ struct stat st = {0};
 
 int train_duration_secs;
 std::string train_config_path;
-YAML::Node sample_data = YAML::LoadFile("test.yaml");
+YAML::Node sample_data = YAML::LoadFile("../models/test.yaml");
 
 std::string nuscenes = "/home/fusy/repos/code2_paper/code2/build/results05/test_features_data_4p2_nuscenes.bin";
 std::string pandaset = "/home/fusy/repos/code2_paper/code2/build/results05/test_features_data_4p2_pandaset.bin";
