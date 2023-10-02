@@ -45,15 +45,18 @@
 
 
 ## Cite Us
+
 If you use this code in an academic context, please cite our [paper](https://www.sciencedirect.com/science/article/pii/S092188902300163X/pdfft?md5=757ff2721816cb1de2334e60069bc588&pid=1-s2.0-S092188902300163X-main.pdf):
 
+```
 @article{FUSARO2023104524,
-title = {Pyramidal 3D feature fusion on polar grids for fast and robust traversability analysis on CPU},
-author = {Daniel Fusaro and Emilio Olivastri and Ivano Donadi and Daniele Evangelista and Emanuele Menegatti and Alberto Pretto},
-journal = {Robotics and Autonomous Systems},
-volume = {170},
-pages = {104524},
-year = {2023},
-issn = {0921-8890},
-doi = {https://doi.org/10.1016/j.robot.2023.104524}
+   title = {Pyramidal 3D feature fusion on polar grids for fast and robust traversability analysis on CPU},
+   author = {Daniel Fusaro and Emilio Olivastri and Ivano Donadi and Daniele Evangelista and Emanuele Menegatti and Alberto Pretto},
+   journal = {Robotics and Autonomous Systems},
+   volume = {170},
+   pages = {104524},
+   year = {2023},
+   issn = {0921-8890},
+   doi = {https://doi.org/10.1016/j.robot.2023.104524}
 }
+```
